@@ -1,0 +1,42 @@
+# User projects, references and generated artifacts stay on the PC.
+/Рабочая папка ИД/
+/Рабочие копии/
+/Пример выгрузки/
+/.local_notes/
+/.project-local.json
+/ПРОМПТ_РАЗРАБОТКИ.md
+/ПРАВИЛА_ПРОЕКТА.md
+/ПРАВИЛА_WORD.md
+/review/*
+!/review/parse_workers.ps1
+!/review/verify_register_sequences.ps1
+/examples/*
+!/examples/README.md
+/Макет ИД.html
+/review_passports.py
+
+# Python/build/editor state
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+build/
+dist/
+*.egg-info/
+.coverage
+htmlcov/
+*.log
+*.tmp
+*.bak
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.DS_Store
+Thumbs.db
+~$*
+
+**/.recovery/
+**/.backups/
