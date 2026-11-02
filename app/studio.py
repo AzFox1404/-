@@ -214,8 +214,17 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         self.reference_path=None
         self.journal().protect(path)
         if getattr(self,'initializing',False):return
-        if path not in self.sessions:self.sessions[path]=Session(path,self.events,prepared=True)
+        if path not in self.sessions:self.sessions[path]=Session(path,self.events,work_file=self.journal().work_file(path))
         super().open(path)
+        # Keep at most two warm Office sessions; do not accumulate one Excel/
+        # Word process per document in a large project.
+        idle=[s for s in self.sessions.values() if s is not self.current and s.source not in self.journal().dirty]
+        for s in idle[:-1]:
+            self.sessions.pop(s.source,None);s.tasks.put(None)
+            if not hasattr(self,'retiring_sessions'):self.retiring_sessions=[]
+            self.retiring_sessions.append(s)
+            for store in (self.models,self.latest,self.revisions,self.saved_rev,self.history,self.redo):store.pop(s,None)
+        self.retiring_sessions=[s for s in getattr(self,'retiring_sessions',[]) if s.thread.is_alive()]
     def import_passport_folder(self):
         path=filedialog.askdirectory(parent=self.root,title='Папка паспортов и сертификатов')
         if not path:return
@@ -620,7 +629,12 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             j=self.journal();j.dirty.add(s.source)
             j.drafts[str(s.source.relative_to(j.base))]=dict(self.models[s])
             from recovery_state import persist
-            persist(j)
+            old=getattr(j,'persist_job',None)
+            if old is not None:self.root.after_cancel(old)
+            def checkpoint():
+                j.persist_job=None
+                if self.journals.get(j.project) is j:persist(j)
+            j.persist_job=self.root.after(300,checkpoint)
     def submit(self,s):
         super().submit(s)
         self.mark_changed(s)
@@ -639,6 +653,6 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         j=self.journal();j.dirty.add(s.source)
         from recovery_state import persist
         persist(j)
-        if self.project and s.copy.is_relative_to(self.project):
+        if self.project and s.source.is_relative_to(self.project):
             mf=self.project/'project.json';meta=json.loads(mf.read_text('utf-8'));edited=set(meta.get('edited',[]))
-            edited.add(str(s.copy.relative_to(self.project)));meta['edited']=sorted(edited);write_json(mf,meta)
+            edited.add(str(s.source.relative_to(self.project)));meta['edited']=sorted(edited);write_json(mf,meta)

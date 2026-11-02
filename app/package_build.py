@@ -459,7 +459,7 @@ class PackageDialog:
         self.totals_text.set(f'Расчёт страниц · Примерно {self.stats_estimate:.0f} сек.')
         state={'progress':'Подготовка','completed':0}
 
-        cache={s.copy:data for s,data in self.app.latest.items() if self.app.saved_rev.get(s,-1)==self.app.revisions.get(s)}
+        cache={s.source:data for s,data in self.app.latest.items() if self.app.saved_rev.get(s,-1)==self.app.revisions.get(s)}
         def work():
             try:events.put(('done',measure_selection(self.app.project,selected,cache,opts,self.stats_cancel,lambda x:events.put(('status',x)))))
             except Exception as exc:events.put(('error',str(exc)))
@@ -592,7 +592,7 @@ class PackageDialog:
         if not target:return
         project=self.app.project
         cache={}
-        cache.update({s.copy:data for s,data in self.app.latest.items() if self.app.saved_rev.get(s,-1)==self.app.revisions.get(s)})
+        cache.update({s.source:data for s,data in self.app.latest.items() if self.app.saved_rev.get(s,-1)==self.app.revisions.get(s)})
         events=queue.Queue();self.busy=True;self.go.state(['disabled'])
         self.window.protocol('WM_DELETE_WINDOW',lambda:messagebox.showinfo('Сборка','Идёт сохранение комплекта.'))
         def worker():

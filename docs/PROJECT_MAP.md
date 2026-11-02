@@ -12,7 +12,7 @@
 | Перетягивание стеклянных панелей | `app/glass_resize.py` | `tests/verify_home_drag_release.py`, `tests/verify_glass_resize.py` |
 | Поля ввода/выбор строки | `app/studio.py` (`visible_fields`, `queue_register_operation`) | `app/office_forms.py`, `app/act_layout.py` |
 | Общие пути и локальная конфигурация | `app/app_paths.py` | `BUREAU_ID_DATA_DIR`, `BUREAU_ID_EXAMPLES_DIR` |
-| Очередь Office и ответы | `workspace_preview.Session` | `app/PreviewWorker.ps1` |
+| Очередь Office и ответы | `workspace_preview.Session` | `app/PreviewWorker.ps1`; clean PDF перед review PDF, до двух тёплых сеансов |
 | Excel: поля и перенос строк | `app/act_layout.py`, `app/ActFlow.ps1` | `data/act_anchors.json`, `app/BindExcel.ps1` |
 | Excel: реестры, вставка/удаление | `app/RegisterRows.ps1` | `app/office_forms.py`, `app/MakeRegistry.ps1` |
 | Word: распознавание и запись | `app/word_fields.py`, `app/WordFields.ps1` | `app/ConvertWord.ps1`, `app/manual_fields.py` |
@@ -23,7 +23,7 @@
 | Ctrl+C/V/X/Z/Y, выделение, колесо | `app/clipboard_keys.py`, `app/drag_selection.py`, `app/interactions.py`, `app/auto_scroll.py` | `app/keyboard_navigation.py` |
 | Паспорта и сертификаты | `app/scanner_ui.py`, `app/passports.py` | `app/quality_library.py`, `app/PassportOCR.ps1` |
 | Комплект для печати | `app/package_build.py`, `app/package_checks.py` | `app/MakeRegistry.ps1`, `Session` |
-| Сохранить / не сохранять | `app/save_decisions.py`, `app/recovery_state.py` | `.recovery`, `.backups` внутри проекта |
+| Сохранить / не сохранять | `app/save_decisions.py`, `app/recovery_state.py` | `.recovery/baseline`, `working`, `checkpoints`, `.backups` внутри проекта |
 | Drag-and-drop файлов | `app/win_drop.py` | `vendor/tkdnd-win-x64/` |
 | Проверки | `tools/check_project.py`, `verify_*.py` | `docs/DEVELOPMENT.md` |
 | GitHub и локальная история | `tools/github_bundle.py` | `docs/SYNC.md`, `.git/codex-sync/` |

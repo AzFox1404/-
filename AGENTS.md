@@ -27,6 +27,8 @@ There is no background folder watcher. Synchronization occurs while handling an 
 - Preserve text and view state when hiding panels. Additional windows work in fullscreen; the application never remains globally topmost.
 - Never block Tk with Office, OCR, PDF rendering, a thread join or a synchronous worker wait.
 - Pane drag must release mouse capture over glass, the line, original controls, Escape, unmap, focus loss and destruction. Preserve the regression checks for these routes.
+- Edit only recovery working copies. Rename a source by remapping its live session and journal; never stop/reopen or save fields merely to rename. Keep immutable project-opening baseline separate from document-save checkpoints. Whole-project discard restores that baseline, including names and already confirmed per-document saves. Preserve the Excel/Word transaction regression tests.
+- Keep at most two warm Office sessions; emit clean PDF before coloured review. Do not mark repeated identical values as edits.
 - Queue registry mutations before waiting for PDF; first-position insertion is before the selected first row. Renumber sections without counting headings.
 - User documents and original sample folders must never be modified by tests. Use temporary copies.
 

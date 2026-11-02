@@ -33,9 +33,17 @@ with tempfile.TemporaryDirectory() as td:
         state=root.taskbar_reveal
         assert state['height']==r.bottom-task.top and state['height']>0,state
         assert before==(root.winfo_width(),root.winfo_height()),'must clip, never reflow the application'
+        # Simulate the shell promoting its taskbar during an Aero Peek preview.
+        u.SetWindowPos(bar,C.c_void_p(-1),0,0,0,0,0x13)
         # Leaving the activation area restores the whole window and stops polling.
         point[1]=r.top+100;pump(root,.5)
-        assert state['height']==0 and state['timer'] is None and state['frame'] is None,state
+        assert state['height']==0 and state['frame'] is None,state
+        assert not u.GetWindowLongPtrW(bar,-20)&8,'taskbar must not remain above the active fullscreen app'
+        # A click back into the app starts outside the trigger: it must hide a
+        # shell-promoted taskbar even without another bottom-edge mouse motion.
+        state['reset']();u.SetWindowPos(bar,C.c_void_p(-1),0,0,0,0,0x13)
+        root.event_generate('<FocusIn>');pump(root)
+        assert not u.GetWindowLongPtrW(bar,-20)&8 and state['height']==0
         # A fullscreen exit mid-reveal must also clear its native region.
         point[1]=r.bottom-10
         root.event_generate('<Motion>',x=100,y=root.winfo_height()-10,rootx=point[0],rooty=point[1]);pump(root,.12)
@@ -45,6 +53,6 @@ with tempfile.TemporaryDirectory() as td:
         u.GetCursorPos=original_cursor;u.GetForegroundWindow=original_foreground
     assert not errors,errors
     app.close()
-    print('PASS icon-only hints; fullscreen taskbar clip/reveal/leave/exit; no layout resizing or idle polling')
+    print('PASS icon-only hints; fullscreen reveal, shell promotion, leave/exit and native stacking; no layout resizing')
 
 

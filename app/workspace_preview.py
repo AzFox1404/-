@@ -26,12 +26,13 @@ BG, PAPER, ACCENT = '#faf5f1','#fffdfa','#eac7b4'
 
 
 class Session:
-    def __init__(self, path, events, prepared=False):
+    def __init__(self, path, events, prepared=False, work_file=None):
         self.source = path
         directory = ROOT / 'Рабочие копии' / uuid.uuid4().hex[:10]
-        if not prepared: directory.mkdir(parents=True)
-        self.copy = path if prepared else directory / path.name
-        if not prepared: shutil.copyfile(path, self.copy)
+        if not prepared and not work_file: directory.mkdir(parents=True)
+        self.copy = Path(work_file) if work_file else path if prepared else directory / path.name
+        if work_file:self.copy.parent.mkdir(parents=True,exist_ok=True)
+        if self.copy!=path and not self.copy.exists():shutil.copyfile(path,self.copy)
         import tempfile
         self.preview_dir=Path(tempfile.mkdtemp(prefix='bureau-preview-'))
         self.events = events
@@ -50,7 +51,12 @@ class Session:
             if self.copy.suffix.lower() in ('.doc','.docx'):
                 from word_fields import prepare_word
                 from project_analysis import preferred_word_plan,save_word_plan
-                plan=preferred_word_plan(self.copy) or prepare_word(self.copy,self.preview_dir/'word');spec=plan['fields'];prepared=plan['prepared'];self.analysis=plan
+                plan=preferred_word_plan(self.copy)
+                if not plan:
+                    try:
+                        if self.copy.read_bytes()==self.source.read_bytes():plan=preferred_word_plan(self.source)
+                    except OSError:pass # source can be renamed while opening
+                plan=plan or prepare_word(self.copy,self.preview_dir/'word');spec=plan['fields'];prepared=plan['prepared'];self.analysis=plan
             else:spec=extra_fields(self.copy)
             self.spec=spec;self.labels={k:v['label'] for k,v in spec.items()}
             mapfile=self.preview_dir/'Карта.json'
@@ -115,6 +121,9 @@ class Session:
                 process.stdin.write(json.dumps(dict(values=fields,pdf=str(pdf),reviewPdf=str(review),changedKeys=changed,structuralReview=self.structural_review,**context))+'\n')
                 process.stdin.flush()
                 response=receive()
+                if response.get('cleanReady'):
+                    self.events.put((self,'clean',(revision,pdf.read_bytes())))
+                    response=receive()
                 self.review_pdf=(revision,review.read_bytes()) if response.get('hasReview') else None
                 if hasattr(self,'analysis'):save_word_plan(self.copy,self.analysis,self.spec,fields)
                 self.events.put((self,'pdf',(revision,pdf.read_bytes())))
@@ -337,6 +346,7 @@ class Workspace:
             finally:self.following=False
 
     def changed(self,s,key,v):
+        if self.models[s].get(key)==v:return
         entry=getattr(s,'spec',{}).get(key,{})
         try:
             if v and entry.get('kind')=='datecell':datetime.strptime(v,'%d.%m.%Y')
@@ -408,12 +418,13 @@ class Workspace:
                 self.history.pop(s,None);self.redo.pop(s,None)
                 if getattr(s,'row_operations',[]) and hasattr(self,'start_register_operation'):self.start_register_operation(s)
                 elif s==self.current:self.build(1)
-            elif kind=='pdf':
+            elif kind in ('clean','pdf'):
                 rev,data=payload
                 if rev==self.revisions.get(s,0):
+                    unchanged=kind=='clean' and self.latest.get(s)==data
                     self.latest[s]=data
                     if hasattr(self,'saved_rev'):self.saved_rev[s]=rev
-                    if s==self.current:self.draw();self.status.set('PDF обновлён · '+str(s.copy))
+                    if s==self.current and not unchanged:self.draw();self.status.set('PDF обновлён · '+str(s.source))
             elif kind=='error':
                 s.row_operation_busy=False
                 if hasattr(s,'row_operations'):s.row_operations.clear()

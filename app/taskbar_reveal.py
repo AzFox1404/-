@@ -15,11 +15,14 @@ def install(root):
     u.FindWindowW.argtypes=[W.LPCWSTR,W.LPCWSTR];u.FindWindowW.restype=W.HWND
     u.GetWindowRect.argtypes=[W.HWND,C.POINTER(W.RECT)]
     u.GetForegroundWindow.restype=W.HWND
+    u.GetWindowLongPtrW.argtypes=[W.HWND,C.c_int];u.GetWindowLongPtrW.restype=C.c_ssize_t
+    u.SetWindowPos.argtypes=[W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT]
     u.SetWindowRgn.argtypes=[W.HWND,W.HRGN,W.BOOL]
     g.CreateRectRgn.argtypes=[C.c_int]*4;g.CreateRectRgn.restype=W.HRGN
     g.DeleteObject.argtypes=[W.HGDIOBJ]
     hwnd=u.GetParent(root.winfo_id()) or root.winfo_id()
-    state={'height':0,'bar':None,'timer':None,'frame':None,'target':0}
+    initial_bar=u.FindWindowW('Shell_TrayWnd',None)
+    state={'height':0,'bar':None,'timer':None,'frame':None,'target':0,'topmost':bool(initial_bar and u.GetWindowLongPtrW(initial_bar,-20)&8),'layered':False}
     root.taskbar_reveal=state
 
     def region(height):
@@ -33,10 +36,12 @@ def install(root):
         for key in ('timer','frame'):
             if state[key] is not None:root.after_cancel(state[key]);state[key]=None
         if state['height']:region(0)
+        if state['bar'] and state['layered']:
+            u.SetWindowPos(state['bar'],C.c_void_p(-1 if state['topmost'] else -2),0,0,0,0,0x13)
+        state['layered']=False
         state.update(height=0,target=0,bar=None)
 
     def animate(target):
-        if not target and not state['height'] and state['frame'] is None:reset();return
         if state['target']==target:return
         state['target']=target
         if state['frame'] is not None:root.after_cancel(state['frame'])
@@ -46,7 +51,6 @@ def install(root):
             t=min(1,(time.monotonic()-began)/.20);ease=t*t*(3-2*t)
             state['height']=round(start+(target-start)*ease);region(state['height'])
             if t<1:state['frame']=root.after(16,frame)
-            elif not target:reset()
         frame()
 
     def poll():
@@ -59,9 +63,23 @@ def install(root):
         if not bar or not u.GetWindowRect(bar,C.byref(bar_rect)):reset();return
         foreground=u.GetForegroundWindow()
         inside=rect.left<=point.x<rect.right and min(rect.bottom-24,bar_rect.top)<=point.y<rect.bottom
-        if foreground not in (hwnd,bar) or not inside:animate(0)
-        else:animate(max(0,rect.bottom-bar_rect.top))
-        if state['bar']:state['timer']=root.after(70,poll)
+        # Aero Peek/taskbar thumbnails may promote Explorer above fullscreen.
+        # Keep the real taskbar immediately below our window while this app is
+        # active; clipping then reveals it smoothly and covering always hides it.
+        if foreground in (hwnd,bar):
+            if inside:
+                if not state['layered'] or u.GetWindowLongPtrW(bar,-20)&8:
+                    u.SetWindowPos(bar,C.c_void_p(-2),0,0,0,0,0x13)
+                    u.SetWindowPos(hwnd,None,0,0,0,0,0x13)
+                    u.SetWindowPos(bar,hwnd,0,0,0,0,0x13);state['layered']=True
+                animate(max(0,rect.bottom-bar_rect.top))
+            else:
+                if state['target'] or u.GetWindowLongPtrW(bar,-20)&8:
+                    u.SetWindowPos(bar,C.c_void_p(-2),0,0,0,0,0x13)
+                    u.SetWindowPos(hwnd,None,0,0,0,0,0x13);state['layered']=True
+                animate(0)
+        else:reset();return
+        if state['bar']:state['timer']=root.after(90,poll)
 
     def motion(event):
         nonlocal hwnd
@@ -75,9 +93,17 @@ def install(root):
         bounds=W.RECT();u.GetWindowRect(hwnd,C.byref(bounds))
         if r.top<bounds.top or r.top>=bounds.bottom or r.bottom<bounds.bottom-4:return
         state['bar']=bar
-        # The clipped application exposes the existing taskbar; keep its z-order
-        # unchanged so the reveal is progressive instead of instantly popping up.
+        # Poll also covers Explorer's capture during taskbar thumbnail previews.
         poll()
     root.bind_all('<Motion>',motion,add='+')
+    def activated(event):
+        # Re-check after native taskbar previews or a click back into the app;
+        # Tk can miss Motion while Explorer owns mouse capture.
+        if root.attributes('-fullscreen') and not state['bar']:
+            point=W.POINT();u.GetCursorPos(C.byref(point))
+            class Position:pass
+            pos=Position();pos.y_root=root.winfo_rooty()+root.winfo_height()
+            motion(pos)
+    root.bind('<FocusIn>',activated,add='+')
     root.bind('<Unmap>',reset,add='+');root.bind('<Destroy>',reset,add='+')
     state['reset']=reset

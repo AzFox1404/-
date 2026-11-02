@@ -17,19 +17,51 @@ class ProjectJournal:
         self.dirs={p.relative_to(self.base) for p in self.base.rglob('*') if p.is_dir()}
         self.manifest=(project/'project.json').read_bytes()
         self.copies={};self.dirty=set();self.removed=set()
+        self.origins={};self.checkpoints={};self.changed=set();self.working={}
         from recovery_state import load
         load(self)
     def protect(self,path):
         rel=path.relative_to(self.base)
+        rel=self.origins.get(rel,rel)
         if rel in self.files and rel not in self.copies and path.is_file():
-            dest=self.root/rel;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,dest);self.copies[rel]=dest
+            dest=self.root/'baseline'/rel;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,dest);self.copies[rel]=dest
             from recovery_state import persist
             persist(self)
+    def work_file(self,path):
+        import uuid
+        rel=path.relative_to(self.base)
+        if rel not in self.working:
+            self.working[rel]=self.root/'working'/uuid.uuid4().hex/path.name
+            from recovery_state import persist
+            persist(self)
+        return self.working[rel]
+    def move_paths(self,source,target):
+        """Remap live identity, keeping the opening baseline immutable."""
+        old=source.relative_to(self.base);new=target.relative_to(self.base)
+        def move(rel):return new/rel.relative_to(old) if rel==old or rel.is_relative_to(old) else rel
+        candidates=set(self.files)|set(self.origins)|set(self.working)
+        origins=dict(self.origins)
+        for rel in candidates:
+            if rel==old or rel.is_relative_to(old):
+                origins[move(rel)]=self.origins.get(rel,rel)
+                origins.pop(rel,None)
+        self.origins=origins
+        for name in ('working','checkpoints'):
+            setattr(self,name,{move(k):v for k,v in getattr(self,name).items()})
+        self.drafts={str(move(Path(k))):v for k,v in self.drafts.items()}
+        self.dirty={self.base/move(p.relative_to(self.base)) for p in self.dirty}
+        self.changed={self.base/move(p.relative_to(self.base)) for p in self.changed}
+        from recovery_state import persist
+        persist(self)
     def restore_document(self,path):
         rel=path.relative_to(self.base)
-        if rel in self.copies:
-            path.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(self.copies[rel],path)
-        elif rel not in self.files:path.unlink(missing_ok=True)
+        origin=self.origins.get(rel,rel)
+        baseline=self.checkpoints.get(rel) or self.copies.get(origin)
+        if baseline:
+            path.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(baseline,path)
+        elif origin not in self.files:path.unlink(missing_ok=True)
+        work=self.working.pop(rel,None)
+        if work:work.unlink(missing_ok=True)
         self.dirty.discard(path)
         self.drafts.pop(str(rel),None)
         from recovery_state import persist
@@ -38,23 +70,25 @@ class ProjectJournal:
         original=json.loads(self.manifest)
         key=str(path.relative_to(self.project))
         edited=set(data.get('edited',[]));edited.discard(key)
-        if key in original.get('edited',[]):edited.add(key)
+        if key in original.get('edited',[]) or rel in self.checkpoints:edited.add(key)
         data['edited']=sorted(edited)
         (self.project/'project.json').write_text(json.dumps(data,ensure_ascii=False,indent=2),'utf-8')
     def commit_document(self,path):
-        from recovery_state import archive
-        archive(self)
         rel=path.relative_to(self.base)
         if path.exists():
-            dest=self.root/rel;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,dest);self.copies[rel]=dest;self.files.add(rel)
+            dest=self.root/'checkpoints'/rel;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,dest);self.checkpoints[rel]=dest
         self.dirty.discard(path)
-        old=json.loads(self.manifest);current=json.loads((self.project/'project.json').read_text('utf-8'))
-        key=str(path.relative_to(self.project));edited=set(old.get('edited',[]))
-        if key in current.get('edited',[]):edited.add(key)
-        old['edited']=sorted(edited);self.manifest=json.dumps(old,ensure_ascii=False).encode('utf-8')
+        self.changed.add(path)
         self.drafts.pop(str(rel),None)
         from recovery_state import persist
         persist(self)
+    def publish_working(self,path):
+        work=self.working.get(path.relative_to(self.base))
+        if not work or work==path:return
+        if not path.exists():return # explicitly removed from the project
+        self.protect(path)
+        temp=path.with_name(path.name+'.bureau-saving')
+        shutil.copy2(work,temp);temp.replace(path)
     def restore(self):
         for p in self.base.rglob('*'):
             if p.is_file() and not p.name.startswith('~$') and p.relative_to(self.base) not in self.files:p.unlink()
@@ -65,10 +99,11 @@ class ProjectJournal:
             if p.is_dir() and p.relative_to(self.base) not in self.dirs and not any(p.iterdir()):p.rmdir()
         (self.project/'project.json').write_bytes(self.manifest)
         self.dirty.clear()
+        self.changed.clear()
         self.removed.clear()
     def dirty_project(self):
         existing={p.relative_to(self.base) for p in self.base.rglob('*') if p.is_file() and not p.name.startswith('~$')}
-        return bool(self.dirty or self.removed or existing!=self.files or {p.relative_to(self.base) for p in self.base.rglob('*') if p.is_dir()}!=self.dirs)
+        return bool(self.dirty or self.changed or self.removed or existing!=self.files or {p.relative_to(self.base) for p in self.base.rglob('*') if p.is_dir()}!=self.dirs)
 
 class SaveDecisions:
     def journal(self):
@@ -109,7 +144,7 @@ class SaveDecisions:
         def finish():
             if any(s.thread.is_alive() for s in sessions):self.root.after(100,finish);return
             wait.grab_release();wait.destroy();self.stopping=False
-            failed=[s for s in sessions if self.saved_rev.get(s,-1)<self.revisions.get(s,0)]
+            failed=[s for s in sessions if s in self.revisions and self.saved_rev.get(s,-1)<self.revisions[s]]
             if require_saved and failed:
                 messagebox.showerror('Сохранение','Не все изменения записаны. Проверьте документ или выберите «Не сохранять».')
                 return
@@ -121,26 +156,51 @@ class SaveDecisions:
     def decide_document(self,s,done):
         j=self.journal()
         if not j or s.source not in j.dirty:
-            self.stop_sessions([s],done);return
+            done();return
         def result(choice):
             if choice=='cancel':return
             def complete():
                 if choice=='discard':j.restore_document(s.source)
                 else:j.commit_document(s.source)
                 done()
-            self.stop_sessions([s],complete,require_saved=choice=='save')
+            if choice=='save':self.save_session(s,lambda:(j.commit_document(s.source),done()))
+            else:self.stop_sessions([s],complete)
         self.ask_save('Сохранить изменения в документе «'+s.source.name+'»?',result)
+    def save_session(self,s,done):
+        """Wait asynchronously for the working copy; never restart Office to save."""
+        if s in self.pending:self.root.after_cancel(self.pending[s]);self.submit(s)
+        wait=tk.Toplevel(self.root);wait.title('Сохранение');wait.transient(self.root)
+        ttk.Label(wait,text='Сохраняем документ…',padding=18).pack();self.paint(wait);wait.grab_set()
+        wait.protocol('WM_DELETE_WINDOW',lambda:None);self.stopping=True
+        def release():
+            wait.grab_release();wait.destroy();self.stopping=False
+        def finish():
+            if not s.thread.is_alive():
+                release()
+                messagebox.showerror('Сохранение','Редактор документа завершился. Изменения оставлены в восстановлении.');return
+            if self.saved_rev.get(s,-1)!=self.revisions.get(s) or getattr(s,'row_operation_busy',False) or getattr(s,'row_operations',[]):
+                self.root.after(60,finish);return
+            try:
+                self.journal().publish_working(s.source)
+            except OSError as e:release();messagebox.showerror('Сохранение',str(e));return
+            release()
+            done()
+        finish()
     def decide_project(self,done):
         j=self.journal()
-        sessions=[s for s in self.sessions.values() if self.project and s.source.is_relative_to(self.project)]
+        sessions=[s for s in [*self.sessions.values(),*getattr(self,'retiring_sessions',[])] if self.project and s.source.is_relative_to(self.project)]
         def finish(choice):
             if choice=='cancel':return
             def complete():
                 self.cancel_scan()
-                if choice=='save':
-                    from recovery_state import archive
-                    archive(j)
-                if choice=='discard':j.restore()
+                try:
+                    if choice=='save':
+                        from recovery_state import archive
+                        archive(j)
+                        for path in list(j.dirty):j.publish_working(path)
+                    if choice=='discard':j.restore()
+                except OSError as e:
+                    messagebox.showerror('Сохранение проекта','Не удалось завершить операцию. Рабочие копии сохранены для повторной попытки.\n'+str(e));return
                 if j:
                     self.journals.pop(j.project,None);j.temp.cleanup()
                 self.current=None;done()

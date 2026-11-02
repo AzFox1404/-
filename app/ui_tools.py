@@ -144,7 +144,7 @@ class Interface:
                     w.tone=name
                 w.configure(bg=c[name])
                 if isinstance(w,(tk.Label,tk.Button,tk.Listbox)):w.configure(fg=c['text'])
-                if isinstance(w,tk.Button):w.configure(activebackground=c['hover'],activeforeground=c['text'])
+                if isinstance(w,tk.Button):w.configure(activebackground=c['hover'],activeforeground='#111111')
                 if isinstance(w,tk.Listbox):w.configure(selectbackground=c['sel'],selectforeground=c['text'])
             if hasattr(w,'redraw_theme'):w.redraw_theme()
             for child in w.winfo_children():walk(child)
@@ -216,7 +216,7 @@ class Interface:
         menu=tk.Menu(row,tearoff=False)
         def popup():
             c=self.colors
-            menu.configure(background=c['paper'],foreground=c['text'],activebackground=c['hover'],activeforeground=c['text'])
+            menu.configure(background=c['paper'],foreground=c['text'],activebackground=c['hover'],activeforeground='#111111')
             try:menu.tk_popup(btn.winfo_rootx(),btn.winfo_rooty()+btn.winfo_height())
             finally:menu.grab_release()
         btn=self.icon_button(row,'import','Импорт · выбрать источник',popup,True)
@@ -349,7 +349,7 @@ class Interface:
         import shutil
         s=self.active_file()
         if not s:return
-        dest=filedialog.asksaveasfilename(initialfile=s.copy.name,defaultextension=s.copy.suffix,filetypes=[('Рабочий документ','*'+s.copy.suffix),('PDF','*.pdf')])
+        dest=filedialog.asksaveasfilename(initialfile=s.source.name,defaultextension=s.copy.suffix,filetypes=[('Рабочий документ','*'+s.copy.suffix),('PDF','*.pdf')])
         if dest:
             try:
                 if Path(dest).suffix.lower()=='.pdf':Path(dest).write_bytes(self.latest[s])
@@ -358,7 +358,7 @@ class Interface:
     def print_current(self):
         s=self.active_file()
         if s:
-            directory=Path(tempfile.mkdtemp(prefix='bureau-print-'));p=directory/(s.copy.stem+'.pdf');p.write_bytes(self.latest[s])
+            directory=Path(tempfile.mkdtemp(prefix='bureau-print-'));p=directory/(s.source.stem+'.pdf');p.write_bytes(self.latest[s])
             try:os.startfile(p,'print')
             except OSError:os.startfile(p);messagebox.showinfo('Печать','Выберите «Печать» в просмотрщике PDF.')
     def assemble(self):

@@ -77,18 +77,20 @@ class FolderOperations:
                 elif operation=='move':
                     source.rename(target);self.update_path_links(source,target)
                     self.journal().removed.add(source)
+                    self.journal().move_paths(source,target)
+                    for s in affected:
+                        self.sessions.pop(s.source,None)
+                        s.source=target/s.source.relative_to(source);self.sessions[s.source]=s
                 else:
                     if source.is_dir():shutil.rmtree(source)
                     else:source.unlink()
                     self.update_path_links(source);self.journal().removed.add(source)
-                if old_current:self.current=None
+                if old_current and operation=='delete':self.current=None
                 self.selected[0]=str(target or source.parent);self.expanded[0].add(str((target or source.parent).parent.resolve()))
                 self.refresh_documents()
                 for n in (1,2):self.build(n)
-                if old_current and target and operation=='move':self.open(target/old_current.relative_to(source),True)
-                elif old_current and operation=='copy':self.open(old_current,True)
             except (OSError,ValueError) as e:messagebox.showerror('Документы',str(e))
-        if affected:self.stop_sessions(affected,apply,require_saved=True)
+        if affected and operation=='delete':self.stop_sessions(affected,apply)
         else:apply()
     def rename_document(self):
         source=self.selected_document_path();name=self.folder_name(source.name)
@@ -118,7 +120,7 @@ class FolderOperations:
         node=tree.identify_row(event.y)
         if node:tree.selection_set(node);tree.focus(node);self.selected[0]=self.tree_selection(tree)
         menu=tk.Menu(tree,tearoff=False)
-        c=self.colors;menu.configure(bg=c['paper'],fg=c['text'],activebackground=c['hover'],activeforeground=c['text'])
+        c=self.colors;menu.configure(bg=c['paper'],fg=c['text'],activebackground=c['hover'],activeforeground='#111111')
         actions=[('Создать папку',self.new_folder),('Переименовать',self.rename_document),
                  ('Вырезать',lambda:self.file_clipboard(True)),('Копировать',self.file_clipboard),
                  ('Вставить',self.paste_document),('Удалить из проекта',self.delete_document)]

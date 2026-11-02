@@ -20,6 +20,7 @@ python tools/check_project.py
 
 | Изменение | Проверка |
 |---|---|
+| Переименование / сохранение / скорость переключения | `verify_rename_transaction.py` (Excel), `verify_word_transaction.py` (Word), `verify_journal_baseline.py` |
 | Захват мыши/стекло | `verify_home_drag_release.py`, `verify_glass_resize.py` |
 | Асинхронный PDF/автопрокрутка/fullscreen | `verify_async_pdf.py` |
 | Символы, повороты, OCR, вставка | `verify_pdf_selection.py` (Windows OCR, временные синтетические документы) |

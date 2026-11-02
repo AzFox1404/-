@@ -131,6 +131,9 @@ try{
    if($excel){$doc.ExportAsFixedFormat(0,[string]$req.pdf)}else{$doc.ExportAsFixedFormat([string]$req.pdf,17)}
     $cleanReady=$true
    }
+   # The clean preview is ready now. Let Tk display it before the more expensive
+   # coloured review-copy export, without allowing review colours into the file.
+   Send @{cleanReady=$true}
    $hasReview=ExportReviewPdf $req
    Send @{ok=$true;hasReview=$hasReview}
   }catch{Send @{error=$_.Exception.Message}}

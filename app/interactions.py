@@ -29,7 +29,7 @@ class Interactions:
         zone=tk.Canvas(parent,height=190,bd=0,highlightthickness=0,cursor='hand2')
         zone.pack(fill='x',pady=18)
         def choose():
-            options=tk.Menu(zone,tearoff=False,bg=self.colors['paper'],fg=self.colors['text'])
+            options=tk.Menu(zone,tearoff=False,bg=self.colors['paper'],fg=self.colors['text'],activebackground=self.colors['hover'],activeforeground='#111111')
             def pick():
                 paths=filedialog.askopenfilenames(filetypes=[('Документы и ZIP','*.doc *.docx *.xls *.xlsx *.zip')])
                 if paths:self.drop_inputs(list(map(Path,paths)))
