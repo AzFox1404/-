@@ -14,8 +14,7 @@ from datetime import datetime
 from PIL import ImageTk
 import pypdfium2 as pdfium
 
-ROOT = Path(__file__).resolve().parent
-from app_paths import EXAMPLES_ROOT
+from app_paths import ROOT, APP_DIR, EXAMPLES_ROOT
 SAMPLES = EXAMPLES_ROOT / '1. КМ'
 NAMES = ['Документы', 'Заполнение', 'Предпросмотр PDF']
 LABELS = dict(work='Наименование работ', address1='Объект и адрес · первая строка',
@@ -58,7 +57,7 @@ class Session:
             mapfile.write_text(json.dumps(spec,ensure_ascii=False),'utf-8')
             layoutfile=self.preview_dir/'layout.json';layoutfile.write_text(json.dumps(act_rows(self.copy),ensure_ascii=False),'utf-8')
             process = subprocess.Popen(['powershell.exe','-NoProfile','-STA','-ExecutionPolicy','Bypass',
-                '-File',str(ROOT/'PreviewWorker.ps1'),'-WorkFile',str(self.copy),'-FieldMap',str(mapfile),'-ActLayout',str(layoutfile),*(['-PreparedFile',prepared] if prepared else [])],
+                '-File',str(APP_DIR/'PreviewWorker.ps1'),'-WorkFile',str(self.copy),'-FieldMap',str(mapfile),'-ActLayout',str(layoutfile),*(['-PreparedFile',prepared] if prepared else [])],
                 encoding='utf-8',stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
                 creationflags=subprocess.CREATE_NO_WINDOW)
             def receive():

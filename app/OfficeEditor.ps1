@@ -9,7 +9,7 @@ public class OfficePosition {
 }
 "@
 [Windows.Forms.Application]::EnableVisualStyles()
-$base=Join-Path $PSScriptRoot 'Рабочие копии'
+$base=Join-Path (Split-Path $PSScriptRoot) 'Рабочие копии'
 if(!$Source -and !$Check -and !$Choose){
  $sample=Join-Path (Split-Path $PSScriptRoot) 'ИД здание 1 - 18х48\1. КМ\1. Колонны\АОСР №КМ-1 Монтаж колонн.xlsx'
  if(Test-Path $sample){$Source=$sample}

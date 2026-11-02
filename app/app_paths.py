@@ -3,7 +3,8 @@ import json
 import os
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+APP_DIR = Path(__file__).resolve().parent
+ROOT = APP_DIR.parent
 try:
     _local = json.loads((ROOT / '.project-local.json').read_text('utf-8-sig'))
 except (OSError, ValueError):

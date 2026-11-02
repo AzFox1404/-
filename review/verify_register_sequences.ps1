@@ -1,6 +1,6 @@
 ﻿param([string]$General,[string]$Quality)
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot '..\RegisterRows.ps1')
+. (Join-Path $PSScriptRoot '..\app\RegisterRows.ps1')
 $app=New-Object -ComObject Excel.Application;$app.DisplayAlerts=$false;$app.EnableEvents=$false
 try{
  foreach($file in @($General,$Quality)){

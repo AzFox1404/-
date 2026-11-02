@@ -6,7 +6,7 @@ for i,pair in enumerate(pairs):
  for role in ('source','prepared'):
   with tempfile.TemporaryDirectory() as td:
    source=Path(td)/'sample.docx';shutil.copyfile(pair[role],source)
-   pdf=Path(td)/'sample.pdf';worker=Path('PreviewWorker.ps1').resolve()
+   pdf=Path(td)/'sample.pdf';worker=__import__('app_paths').APP_DIR/'PreviewWorker.ps1'
    proc=subprocess.Popen(['powershell.exe','-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',str(worker),'-WorkFile',str(source)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,encoding='utf-8',creationflags=subprocess.CREATE_NO_WINDOW)
    ready=json.loads(proc.stdout.readline().lstrip('\ufeff'));assert 'error' not in ready,ready
    proc.stdin.write(json.dumps(dict(values={},pdf=str(pdf)))+'\n');proc.stdin.flush()

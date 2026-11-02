@@ -8,6 +8,10 @@ def active_application():
  u=C.windll.user32;u.GetForegroundWindow.restype=C.c_void_p;pid=C.c_uint();u.GetWindowThreadProcessId(C.c_void_p(u.GetForegroundWindow()),C.byref(pid));return pid.value==os.getpid()
 
 def tooltip(widget,message):
+ # Visible action labels already explain full-size buttons. Keep hints for
+ # icon-only controls and option checkboxes, whose effects need explanation.
+ if isinstance(widget,(ttk.Button,tk.Button,ttk.Menubutton)) and str(widget.cget('text')).strip() not in ('','—','□','↗'):
+  return
  if getattr(widget,'has_hint',False):return
  widget.has_hint=True;widget.hint_message=message;state={'timer':None,'window':None,'monitor':None};widget.hint_state=state
  def hide(*args):

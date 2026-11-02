@@ -15,6 +15,7 @@ import time
 from pypdf import PdfReader,PdfWriter
 from openpyxl import load_workbook
 from workspace_preview import Session,ROOT
+from app_paths import APP_DIR
 
 OFFICE={'.xlsx','.xls','.docx','.doc'}
 def nat(text):
@@ -228,7 +229,7 @@ def make_registry(source,out,pdf,rows,address=''):
     shutil.copy2(source,out)
     payload=pdf.with_suffix('.json');payload.write_text(json.dumps({'entries':[{k:v for k,v in r.items() if k!='item'} for r in rows],'address':address},ensure_ascii=False),'utf-8')
     try:
-        run=subprocess.run(['powershell.exe','-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',str(ROOT/'MakeRegistry.ps1'),'-File',str(out),'-Data',str(payload),'-Pdf',str(pdf)],capture_output=True,creationflags=subprocess.CREATE_NO_WINDOW)
+        run=subprocess.run(['powershell.exe','-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',str(APP_DIR/'MakeRegistry.ps1'),'-File',str(out),'-Data',str(payload),'-Pdf',str(pdf)],capture_output=True,creationflags=subprocess.CREATE_NO_WINDOW)
         if run.returncode:raise ValueError(run.stderr.decode('oem',errors='replace'))
         set_print_width(out)
     finally:payload.unlink(missing_ok=True)

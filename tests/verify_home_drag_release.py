@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory() as td:
   search.focus_force();pump(root,.02)
   x,y=split.sash_coord(0);split.event_generate('<ButtonPress-1>',x=x+1,y=80);pump(root,.03)
   assert state['index']==0 and split.grab_current() is split
-  cover=state['covers'][1]
+  cover=state['covers'][0]
   # Root coordinates reflect an event over the right-hand glass, not the sash.
   target=max(0,min(split.winfo_width()-1,x+offset))
   for sequence in ('<B1-Motion>','<ButtonRelease-1>'):

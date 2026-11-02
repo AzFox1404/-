@@ -4,32 +4,35 @@
 
 | Задача | Где менять | Связанные части |
 |---|---|---|
-| Запуск | `Открыть редактор.cmd`, `workspace_preview.py` (`__main__`) | `studio.Studio`, `app_paths.py` |
-| Главная, проекты, библиотека, дерево | `studio.py` | `project_analysis.py`, `folder_operations.py` |
-| Темы, иконки, подсказки, ленты | `ui_tools.py`, `command_icons.py`, `hints.py` | `app_dialogs.py`, `windows_integration.py` |
-| Панели: отделить, скрыть, вернуть | `workspace_preview.py` (`pane_header`, `collapse_panel`, `restore_panel`) | `studio.build`, `save_decisions.py` |
-| Перетягивание стеклянных панелей | `glass_resize.py` | `verify_home_drag_release.py`, `verify_glass_resize.py` |
-| Поля ввода/выбор строки | `studio.py` (`visible_fields`, `queue_register_operation`) | `office_forms.py`, `act_layout.py` |
-| Общие пути и локальная конфигурация | `app_paths.py` | `BUREAU_ID_DATA_DIR`, `BUREAU_ID_EXAMPLES_DIR` |
-| Очередь Office и ответы | `workspace_preview.Session` | `PreviewWorker.ps1` |
-| Excel: поля и перенос строк | `act_layout.py`, `ActFlow.ps1` | `data/act_anchors.json`, `BindExcel.ps1` |
-| Excel: реестры, вставка/удаление | `RegisterRows.ps1` | `office_forms.py`, `MakeRegistry.ps1` |
-| Word: распознавание и запись | `word_fields.py`, `WordFields.ps1` | `ConvertWord.ps1`, `manual_fields.py` |
-| Ручные привязки | `manual_fields.py`, `manual_excel.py` | `InspectExcel.ps1`, `BindExcel.ps1` |
-| Временный цвет PDF | `ReviewHighlight.ps1` | `Session.review_pdf`; `latest` всегда чистый |
-| Просмотр PDF | `pdf_page_preview.py` | `pdf_renderer.py` → отдельный `pdf_render_worker.py` |
-| Выделение/OCR PDF-текста | `pdf_text_selection.py` | `PassportOCR.ps1` |
-| Ctrl+C/V/X/Z/Y, выделение, колесо | `clipboard_keys.py`, `drag_selection.py`, `interactions.py`, `auto_scroll.py` | `keyboard_navigation.py` |
-| Паспорта и сертификаты | `scanner_ui.py`, `passports.py` | `quality_library.py`, `PassportOCR.ps1` |
-| Комплект для печати | `package_build.py`, `package_checks.py` | `MakeRegistry.ps1`, `Session` |
-| Сохранить / не сохранять | `save_decisions.py`, `recovery_state.py` | `.recovery`, `.backups` внутри проекта |
-| Drag-and-drop файлов | `win_drop.py` | `vendor/tkdnd-win-x64/` |
+| Запуск | `Бюро ИД.cmd`, `app/workspace_preview.py` (`__main__`) | `studio.Studio`, `app/app_paths.py` |
+| Главная, проекты, библиотека, дерево | `app/studio.py` | `app/project_analysis.py`, `app/folder_operations.py` |
+| Панель задач при fullscreen | `app/taskbar_reveal.py` | нижняя зона 24px; маска окна, без изменения настроек Windows |
+| Темы, иконки, подсказки, ленты | `app/ui_tools.py`, `app/command_icons.py`, `app/hints.py` | `app/app_dialogs.py`, `app/windows_integration.py` |
+| Панели: отделить, скрыть, вернуть | `app/workspace_preview.py` (`pane_header`, `collapse_panel`, `restore_panel`) | `studio.build`, `app/save_decisions.py` |
+| Перетягивание стеклянных панелей | `app/glass_resize.py` | `tests/verify_home_drag_release.py`, `tests/verify_glass_resize.py` |
+| Поля ввода/выбор строки | `app/studio.py` (`visible_fields`, `queue_register_operation`) | `app/office_forms.py`, `app/act_layout.py` |
+| Общие пути и локальная конфигурация | `app/app_paths.py` | `BUREAU_ID_DATA_DIR`, `BUREAU_ID_EXAMPLES_DIR` |
+| Очередь Office и ответы | `workspace_preview.Session` | `app/PreviewWorker.ps1` |
+| Excel: поля и перенос строк | `app/act_layout.py`, `app/ActFlow.ps1` | `data/act_anchors.json`, `app/BindExcel.ps1` |
+| Excel: реестры, вставка/удаление | `app/RegisterRows.ps1` | `app/office_forms.py`, `app/MakeRegistry.ps1` |
+| Word: распознавание и запись | `app/word_fields.py`, `app/WordFields.ps1` | `app/ConvertWord.ps1`, `app/manual_fields.py` |
+| Ручные привязки | `app/manual_fields.py`, `app/manual_excel.py` | `app/InspectExcel.ps1`, `app/BindExcel.ps1` |
+| Временный цвет PDF | `app/ReviewHighlight.ps1` | `Session.review_pdf`; `latest` всегда чистый |
+| Просмотр PDF | `app/pdf_page_preview.py` | `app/pdf_renderer.py` → отдельный `app/pdf_render_worker.py` |
+| Выделение/OCR PDF-текста | `app/pdf_text_selection.py` | `app/PassportOCR.ps1` |
+| Ctrl+C/V/X/Z/Y, выделение, колесо | `app/clipboard_keys.py`, `app/drag_selection.py`, `app/interactions.py`, `app/auto_scroll.py` | `app/keyboard_navigation.py` |
+| Паспорта и сертификаты | `app/scanner_ui.py`, `app/passports.py` | `app/quality_library.py`, `app/PassportOCR.ps1` |
+| Комплект для печати | `app/package_build.py`, `app/package_checks.py` | `app/MakeRegistry.ps1`, `Session` |
+| Сохранить / не сохранять | `app/save_decisions.py`, `app/recovery_state.py` | `.recovery`, `.backups` внутри проекта |
+| Drag-and-drop файлов | `app/win_drop.py` | `vendor/tkdnd-win-x64/` |
 | Проверки | `tools/check_project.py`, `verify_*.py` | `docs/DEVELOPMENT.md` |
 | GitHub и локальная история | `tools/github_bundle.py` | `docs/SYNC.md`, `.git/codex-sync/` |
 
 ## Каталоги
 
-- Корень: рабочие Python-модули, Office PowerShell workers, проверки. Расположение пока сохранено для совместимости.
+- Корень: запуск «Бюро ИД», README, инструкции агента и списки зависимостей.
+- `app/`: рабочие Python-модули и Office PowerShell workers; их относительные связи сохранены.
+- `tests/`: проверки; запуск через `python tools/run_check.py имя_проверки.py`.
 - `docs/`: краткие общие требования, текущее состояние и регламент разработки.
 - `tools/`: лёгкие служебные проверки и обмен с GitHub.
 - `data/`: только обезличенные постоянные подписи форм, не сами заполненные документы.

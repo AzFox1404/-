@@ -14,6 +14,8 @@ python tools/check_project.py
 
 Проверяются синтаксис Python/PowerShell, JSON и комплектность исходников. Не запускаются GUI, OCR, Office, полный скан папок и тяжёлый набор интеграционных тестов.
 
+Выбранную проверку из `tests/` запускать так: `python tools/run_check.py verify_home_drag_release.py`. Среда импортов и рабочая папка выставляются автоматически.
+
 ## Выбор регрессии по задаче
 
 | Изменение | Проверка |
@@ -22,6 +24,7 @@ python tools/check_project.py
 | Асинхронный PDF/автопрокрутка/fullscreen | `verify_async_pdf.py` |
 | Символы, повороты, OCR, вставка | `verify_pdf_selection.py` (Windows OCR, временные синтетические документы) |
 | Сканер/разделение | `verify_scan_checklist.py`, `verify_scan_split.py` |
+| Нижняя панель ОС / подсказки | `verify_taskbar_hints.py` (виртуальные координаты; без движения мыши пользователя) |
 | Ленты/вспомогательные окна | `verify_utility_controls.py` |
 | Панели/полнота иконок | `verify_panel_fit.py`, `verify_panel_preservation.py` (Office + собственные примеры) |
 | Реестр: очередь, первая позиция | `verify_row_queue_and_panels.py` (Excel + собственный общий реестр), `verify_word_first_row.py` (Word + собственное приложение) |
@@ -35,7 +38,7 @@ python tools/check_project.py
 - Tk — только в главном потоке. PDF работает отдельным процессом; Office — через управляемый PowerShell worker.
 - `PreviewWorker.ps1` подключает `ActFlow.ps1`, `RegisterRows.ps1`, `WordFields.ps1`, `ReviewHighlight.ps1` относительно `$PSScriptRoot`.
 - Проверенные карты Excel дополнены обезличенными якорями `data/act_anchors.json`. Они не содержат заполненных полей и не заменяют проверку неизвестной формы.
-- Не переносить модули из корня без миграции путей Python, PowerShell, vendor и лаунчера.
+- Модули Python и связанные PowerShell workers находятся в `app/`. `ROOT` указывает на корень проекта, `APP_DIR` — на `app/`; данные и vendor остаются в корне.
 - EXE пока не собирается. Для упаковки нужны режим отдельного PDF worker, ресурсы TkDND, PowerShell-скрипты, зависимости и проверка условий распространения.
 
 Результат проверки фиксировать в `docs/CHANGELOG.md`; не выдавать успех синтаксиса за визуальную проверку произвольных документов.

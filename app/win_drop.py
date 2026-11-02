@@ -3,7 +3,7 @@ from pathlib import Path
 
 def accept_files(widget, handler):
     tk=widget.tk
-    lib=Path(__file__).resolve().parent/'vendor'/'tkdnd-win-x64'
+    lib=Path(__file__).resolve().parents[1]/'vendor'/'tkdnd-win-x64'
     if not tk.call('package','provide','tkdnd'):
         tk.call('lappend','auto_path',str(lib))
         tk.call('package','require','tkdnd')

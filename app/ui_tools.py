@@ -42,7 +42,7 @@ class Interface:
                 if detached and self.root.attributes('-fullscreen'):
                     w._fullscreen_owner=True
                     if str(w.transient())!=str(self.root):w.transient(self.root)
-                if not detached and not getattr(w,'_dialog_owner_set',False):
+                if not detached and not getattr(w,'_taskbar_utility',False) and not getattr(w,'_dialog_owner_set',False):
                     w._dialog_owner_set=True
                     owner=w.master.winfo_toplevel()
                     if owner is not w:
@@ -161,43 +161,20 @@ class Interface:
         if pair not in self.icons:self.icons[pair]=command_icon(self.root,key,self.colors['text'])
         return self.icons[pair]
     def window_ribbon(self,window):
-        """Utilities keep a native close button and share in-app window controls."""
+        """Utilities use panel-sized glyphs and native taskbar minimization."""
+        from windows_integration import normal_window
+        window._taskbar_utility=True
+        window.transient('');normal_window(window)
         row=tk.Frame(window,bg=self.colors['accent']);row.tone='accent';row.pack(fill='x')
         window.utility_ribbon=row
         def restore():
             window.deiconify();window.lift()
-            button=getattr(window,'restore_link',None)
-            if button is not None and button.winfo_exists():button.destroy()
-            window.restore_link=None
-            bar=getattr(self,'utility_restore_bar',None)
-            if bar is not None and not bar.winfo_children():bar.pack_forget()
         def hide():
-            window.withdraw()
-            bar=getattr(self,'utility_restore_bar',None)
-            if bar is None or not bar.winfo_exists():
-                bar=ttk.Frame(self.root,style='Strip.TFrame');self.utility_restore_bar=bar
-            if not bar.winfo_manager():
-                before=next((w for w in (getattr(self,'header',None),getattr(self,'landing',None),getattr(self,'split',None)) if w is not None and w.winfo_exists() and w.winfo_manager()=='pack'),None)
-                bar.pack(fill='x',**({'before':before} if before else {}))
-            if getattr(window,'restore_link',None) is None:
-                b=ttk.Button(bar,text='Вернуть · '+window.title(),style='Compact.TButton',image=self.icon('restore'),compound='left',command=restore)
-                b.pack(side='left',padx=5,pady=3);window.restore_link=b;tooltip(b,'Показать свёрнутое окно')
-        def separate():
-            detached=not getattr(window,'utility_detached',False)
-            if detached and self.root.attributes('-fullscreen'):self.toggle_fullscreen()
-            window.utility_detached=detached;window.transient('' if detached else self.root);window.lift()
-            arrow.glyph='restore' if detached else 'detach';arrow.redraw_theme()
-        buttons={}
-        for key,label,action in reversed([('minimize','Свернуть только это окно',hide),('windowmax','Развернуть или восстановить окно',lambda:self.maximize(window)),('detach','Отделить окно / вернуть в группу приложения',separate)]):
-            button=self.icon_button(row,key,label,action);button.pack_forget();button.pack(side='right',padx=1);buttons[key]=button
-        arrow=buttons['detach'];window.utility_actions=dict(hide=hide,restore=restore,separate=separate)
-        def cleanup(event):
-            if event.widget is not window:return
-            b=getattr(window,'restore_link',None)
-            if b is not None and b.winfo_exists():b.destroy()
-            bar=getattr(self,'utility_restore_bar',None)
-            if bar is not None and bar.winfo_exists() and not bar.winfo_children():bar.pack_forget()
-        window.bind('<Destroy>',cleanup,add='+')
+            window.iconify()
+        # The exact same text glyphs, spacing and ttk surface as pane_header.
+        for label,action in [('□',lambda:self.maximize(window)),('—',hide)]:
+            ttk.Button(row,text=label,command=action,style='Window.TButton',width=2,takefocus=False).pack(side='right')
+        window.utility_actions=dict(hide=hide,restore=restore)
         return row
     def icon_button(self,parent,key,label,action,dropdown=False):
         # Paint the entire icon cell against its actual parent. Native ttk buttons
@@ -269,6 +246,9 @@ class Interface:
     def toggle_fullscreen(self):
         from windows_integration import monitor_bounds,cover_monitor
         active=not self.root.attributes('-fullscreen')
+        from taskbar_reveal import install as taskbar_install
+        taskbar_install(self.root)
+        if not active:self.root.taskbar_reveal['reset']()
         if active:
             self._before_full=(self.root.geometry(),self.root.state());bounds=monitor_bounds(self.root)
             self.root.attributes('-fullscreen',True)

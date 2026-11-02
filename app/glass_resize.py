@@ -1,4 +1,4 @@
-"""One blurred capture per splitter drag, painted in ordinary Tk child widgets."""
+"""One fixed glass canvas per drag; never move native child windows mid-drag."""
 import ctypes as C
 from ctypes import wintypes as W
 import tkinter as tk
@@ -37,6 +37,7 @@ def install(split,app):
     def finish(event=None,commit=False):
         if state['index'] is None:return
         if state['paint'] is not None:split.after_cancel(state['paint']);state['paint']=None
+        split.proxy_forget()
         if commit and state['target'] is not None:
             x,y=split.sash_coord(state['index'])
             split.sash_place(state['index'],state['target'] if horizontal else x,y if horizontal else state['target'])
@@ -51,7 +52,11 @@ def install(split,app):
             if state['focus'] is not None and state['focus'].winfo_exists() and state['focus'].winfo_viewable():state['focus'].focus_set()
         except tk.TclError:pass
         state['index']=None
-        covers=list(state['covers']);line=state['line'];state['covers']=[];state['cards']=[];state['line']=None
+        covers=list(state['covers']);line=state['line']
+        # Keep PhotoImages alive until the glass is actually removed, otherwise
+        # the last frame goes blank while Tk commits the real pane geometry.
+        for cover in covers:cover.retiring_photos=[card.get('photo') for card in state['cards']]
+        state['covers']=[];state['cards']=[];state['line']=None
         def reveal():
             state['reveal_timer']=None;state['reveal_now']=None
             for cover in covers:
@@ -70,6 +75,7 @@ def install(split,app):
         state['paint']=None
         if state['index'] is None:return
         idx=state['index'];target=state['target'];gap=3
+        overlay=state['covers'][0]
         for n,card in enumerate(state['cards']):
             x,y,w,h=card['rect']
             if n==idx:
@@ -78,7 +84,7 @@ def install(split,app):
             elif n==idx+1:
                 if horizontal:w=x+w-target-gap;x=target+gap
                 else:h=y+h-target-gap;y=target+gap
-            w=max(1,w);h=max(1,h);cover=card['cover']
+            w=max(1,w);h=max(1,h)
             if card.get('last')==(x,y,w,h):continue
             card['last']=(x,y,w,h)
             im=card['image'].resize((w,h),Image.Resampling.BILINEAR)
@@ -88,16 +94,14 @@ def install(split,app):
             if w>6 and h>14:
                 edge=Image.blend(Image.new('RGB',(1,1),app.colors['glass']),Image.new('RGB',(1,1),'white'),.08).getpixel((0,0))
                 d.rounded_rectangle((1,1,w-2,h-2),radius=6,outline=edge,width=1)
-            cover.photo=ImageTk.PhotoImage(rounded,master=cover);cover.delete('all');cover.create_image(0,0,image=cover.photo,anchor='nw')
-            cover.place(x=x,y=y,width=w,height=h)
-        line=state['line'];line.delete('all')
+            card['photo']=ImageTk.PhotoImage(rounded,master=overlay)
+            overlay.itemconfigure(card['item'],image=card['photo']);overlay.coords(card['item'],x,y)
+        overlay.delete('divider')
         length=max(1,(split.winfo_height() if horizontal else split.winfo_width())-12)
-        line.configure(bg=app.colors['bg'])
         if horizontal:
-            line.place(x=target,y=6,width=3,height=length);line.create_line(1,1,1,length-2,fill=app.colors['accent'],width=2,capstyle='round')
+            overlay.create_line(target+1,6,target+1,length+4,fill=app.colors['accent'],width=2,capstyle='round',tags='divider')
         else:
-            line.place(x=6,y=target,width=length,height=3);line.create_line(1,1,length-2,1,fill=app.colors['accent'],width=2,capstyle='round')
-        line.tk.call('raise',str(line))
+            overlay.create_line(6,target+1,length+4,target+1,fill=app.colors['accent'],width=2,capstyle='round',tags='divider')
     def start(event):
         hit=split.identify(event.x,event.y)
         if not hit:return
@@ -115,6 +119,10 @@ def install(split,app):
             # Capture input before taking snapshots. A fast mouse-up may already
             # be queued for an underlying Entry/Treeview before covers are mapped.
             split.focus_set();split.grab_set()
+            # Capture all panes before mapping one opaque backing. Its native
+            # rectangle stays fixed; only canvas image items move. The backing
+            # covers the old sash too, including rounded-card corner gaps.
+            snapshots=[]
             for name in split.panes():
                 pane=split.nametowidget(str(name))
                 try:im=capture(pane)
@@ -122,11 +130,12 @@ def install(split,app):
                 if im is None:im=Image.new('RGB',(pane.winfo_width(),pane.winfo_height()),app.colors['glass'])
                 im=Image.blend(im.filter(ImageFilter.GaussianBlur(1.15)),Image.new('RGB',im.size,app.colors['glass']),.27)
                 im=Image.blend(im,Image.new('RGB',im.size,'black'),.045)
-                cover=tk.Canvas(split,bd=0,highlightthickness=0,takefocus=False)
-                route(cover)
-                state['covers'].append(cover);state['cards'].append(dict(cover=cover,image=im,rect=(pane.winfo_x(),pane.winfo_y(),pane.winfo_width(),pane.winfo_height())))
-            state['line']=tk.Canvas(split,bd=0,highlightthickness=0,takefocus=False)
-            route(state['line'])
+                snapshots.append((pane,im))
+            cover=tk.Canvas(split,bd=0,highlightthickness=0,takefocus=False,bg=app.colors['bg'])
+            route(cover);cover.place(x=0,y=0,relwidth=1,relheight=1)
+            state['covers']=[cover];state['line']=cover
+            for pane,im in snapshots:
+                state['cards'].append(dict(item=cover.create_image(0,0,anchor='nw'),image=im,rect=(pane.winfo_x(),pane.winfo_y(),pane.winfo_width(),pane.winfo_height())))
             paint()
         except Exception:
             finish()

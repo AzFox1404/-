@@ -18,12 +18,15 @@ with tempfile.TemporaryDirectory() as td:
  hwnd=u.GetParent(top.winfo_id());proc=u.GetWindowLongPtrW(hwnd,-4);resize_preview.install(top);assert u.GetWindowLongPtrW(hwnd,-4)==proc
  im=capture(split.nametowidget(str(split.panes()[0])));assert im and len(im.getcolors(im.width*im.height) or [])>10
  x,y=split.sash_coord(0);split.event_generate('<ButtonPress-1>',x=x+2,y=40);pump(r)
- assert len(split.glass_state['covers'])==2
+ assert len(split.glass_state['covers'])==1
  for c in split.glass_state['covers']:assert c.winfo_viewable()
  before=split.nametowidget(str(split.panes()[0])).winfo_width()
  split.event_generate('<B1-Motion>',x=x+45,y=40);pump(r)
  assert split.nametowidget(str(split.panes()[0])).winfo_width()==before
- assert int(split.cget('sashwidth'))==3 and split.glass_state['line'].winfo_height()==split.winfo_height()-12
+ assert int(split.cget('sashwidth'))==3
+ overlay=split.glass_state['covers'][0]
+ assert (overlay.winfo_x(),overlay.winfo_y(),overlay.winfo_width(),overlay.winfo_height())==(0,0,split.winfo_width(),split.winfo_height())
+ assert len(overlay.find_withtag('divider'))==1
  split.event_generate('<ButtonRelease-1>',x=x+45,y=40);pump(r)
  assert not split.glass_state['covers'];assert not split.cget('opaqueresize')
  for offset in (25,-25,35,-35):

@@ -34,7 +34,7 @@ There is no background folder watcher. Synchronization occurs while handling an 
 
 Run `python tools/check_project.py` first. Then only relevant `verify_*.py`; see `docs/DEVELOPMENT.md`. Office/UI checks are Windows-only and may require private sample files. Do not run every expensive test for a documentation-only change.
 
-Keep runtime modules and PowerShell workers at the repository root until a separately tested import/path migration: workers locate resources relative to `__file__` / `$PSScriptRoot`.
+Runtime modules and PowerShell workers live together in `app/`; ROOT is the project directory, APP_DIR is the runtime directory. Launch regressions with `python tools/run_check.py verify_name.py` from the project root. Do not scan or execute every test.
 
 Do not publish `.project-local.json`, `.local_notes`, user projects, working copies, OCR caches, source templates, screenshots or personal investigation notes. Existing ignored Russian rules/history files remain local references when a specific case requires them. Do not replace those user files with Git versions.
 
