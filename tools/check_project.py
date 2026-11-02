@@ -6,7 +6,7 @@ def main():
     for path in sources:ast.parse(path.read_text('utf-8-sig'),filename=str(path))
     assets=list((ROOT/'data').glob('*.json'))+list((ROOT/'docs').glob('*.json'))
     for path in assets:json.loads(path.read_text('utf-8-sig'))
-    required=['Бюро ИД.cmd','app/workspace_preview.py','app/studio.py','app/app_paths.py','app/PreviewWorker.ps1','app/ReviewHighlight.ps1','app/pdf_render_worker.py','data/act_anchors.json','vendor/tkdnd-win-x64/LICENSE','vendor/tkdnd-win-x64/libtkdnd2.10.3.dll']
+    required=['Бюро ИД.cmd','app/workspace_preview.py','app/studio.py','app/app_paths.py','app/PreviewWorker.ps1','app/ReviewHighlight.ps1','app/FormulaValidation.ps1','app/fast_preview.py','app/final_pdf_cache.py','app/pdf_render_worker.py','data/act_anchors.json','vendor/tkdnd-win-x64/LICENSE','vendor/tkdnd-win-x64/libtkdnd2.10.3.dll']
     for path in required:
         if not (ROOT/path).is_file():raise SystemExit('Missing resource: '+path)
     if sys.platform=='win32':

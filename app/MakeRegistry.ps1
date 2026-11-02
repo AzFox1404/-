@@ -1,5 +1,6 @@
 ﻿param([string]$File,[string]$Data,[string]$Pdf)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'FormulaValidation.ps1')
 $app=$null;$book=$null
 try{
  $payload=Get-Content -LiteralPath $Data -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -26,5 +27,7 @@ try{
  if($payload.address){$s.Range('B3').Value2=[string]$payload.address}
  $sty.Delete();$s.PageSetup.Zoom=$false;$s.PageSetup.FitToPagesWide=1;$s.PageSetup.FitToPagesTall=$false
  $end=$s.UsedRange.Find('Принял').Row+1;$s.PageSetup.PrintArea="A1:F$end"
- $s.Activate();$book.Save();$book.ExportAsFixedFormat(0,$Pdf)
+ $s.Activate();$app.CalculateFull();$errors=@(GetFormulaErrors $book)
+ if($errors.Count){throw ('Ошибки формул: '+($errors -join ', '))}
+ $book.Save();$book.ExportAsFixedFormat(0,$Pdf)
 }finally{if($book){$book.Close($false)};if($app){$app.Quit()}}

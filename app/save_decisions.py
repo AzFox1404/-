@@ -17,7 +17,7 @@ class ProjectJournal:
         self.dirs={p.relative_to(self.base) for p in self.base.rglob('*') if p.is_dir()}
         self.manifest=(project/'project.json').read_bytes()
         self.copies={};self.dirty=set();self.removed=set()
-        self.origins={};self.checkpoints={};self.changed=set();self.working={}
+        self.origins={};self.checkpoints={};self.changed=set();self.working={};self.saved_names={}
         from recovery_state import load
         load(self)
     def protect(self,path):
@@ -46,7 +46,7 @@ class ProjectJournal:
                 origins[move(rel)]=self.origins.get(rel,rel)
                 origins.pop(rel,None)
         self.origins=origins
-        for name in ('working','checkpoints'):
+        for name in ('working','checkpoints','saved_names'):
             setattr(self,name,{move(k):v for k,v in getattr(self,name).items()})
         self.drafts={str(move(Path(k))):v for k,v in self.drafts.items()}
         self.dirty={self.base/move(p.relative_to(self.base)) for p in self.dirty}
@@ -56,12 +56,21 @@ class ProjectJournal:
     def restore_document(self,path):
         rel=path.relative_to(self.base)
         origin=self.origins.get(rel,rel)
+        target=self.base/self.saved_names.get(rel,origin)
+        if target!=path and target.exists():raise ValueError('Не удалось вернуть имя: '+target.name+' уже существует.')
         baseline=self.checkpoints.get(rel) or self.copies.get(origin)
+        had_checkpoint=rel in self.checkpoints
+        work=self.working.pop(rel,None)
+        if work:work.unlink(missing_ok=True)
+        self.dirty.discard(path);self.drafts.pop(str(rel),None)
+        old_key=str(path.relative_to(self.project))
+        if target!=path:
+            target.parent.mkdir(parents=True,exist_ok=True);path.rename(target)
+            self.move_paths(path,target);self.removed.discard(target)
+            path=target;rel=path.relative_to(self.base)
         if baseline:
             path.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(baseline,path)
         elif origin not in self.files:path.unlink(missing_ok=True)
-        work=self.working.pop(rel,None)
-        if work:work.unlink(missing_ok=True)
         self.dirty.discard(path)
         self.drafts.pop(str(rel),None)
         from recovery_state import persist
@@ -69,16 +78,18 @@ class ProjectJournal:
         data=json.loads((self.project/'project.json').read_text('utf-8'))
         original=json.loads(self.manifest)
         key=str(path.relative_to(self.project))
-        edited=set(data.get('edited',[]));edited.discard(key)
-        if key in original.get('edited',[]) or rel in self.checkpoints:edited.add(key)
+        edited=set(data.get('edited',[]));edited.discard(key);edited.discard(old_key)
+        if key in original.get('edited',[]) or had_checkpoint:edited.add(key)
         data['edited']=sorted(edited)
         (self.project/'project.json').write_text(json.dumps(data,ensure_ascii=False,indent=2),'utf-8')
+        return path
     def commit_document(self,path):
         rel=path.relative_to(self.base)
         if path.exists():
             dest=self.root/'checkpoints'/rel;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,dest);self.checkpoints[rel]=dest
         self.dirty.discard(path)
         self.changed.add(path)
+        self.saved_names[rel]=rel
         self.drafts.pop(str(rel),None)
         from recovery_state import persist
         persist(self)
@@ -137,30 +148,51 @@ class SaveDecisions:
         wait=tk.Toplevel(self.root);wait.title('Документы');self.stopping=True
         ttk.Label(wait,text='Завершаем операции с документами…',padding=18).pack()
         wait.protocol('WM_DELETE_WINDOW',lambda:None);self.paint(wait);wait.grab_set()
-        for s in sessions:
-            if s in getattr(self,'pending',{}):
-                self.root.after_cancel(self.pending[s]);self.submit(s)
-            s.tasks.put(None)
         def finish():
             if any(s.thread.is_alive() for s in sessions):self.root.after(100,finish);return
             wait.grab_release();wait.destroy();self.stopping=False
-            failed=[s for s in sessions if s in self.revisions and self.saved_rev.get(s,-1)<self.revisions[s]]
+            failed=[s for s in sessions if s in self.revisions and (self.saved_rev.get(s,-1)<self.revisions[s] or s.validated_revision<self.revisions[s] or s.formula_errors)]
             if require_saved and failed:
                 messagebox.showerror('Сохранение','Не все изменения записаны. Проверьте документ или выберите «Не сохранять».')
                 return
             for s in sessions:
+                s.closed_pdf=(self.latest.get(s),self.revisions.get(s))
                 self.sessions.pop(s.source,None)
                 for store in (self.models,self.latest,self.revisions,self.saved_rev,self.history,self.redo):store.pop(s,None)
             done()
-        finish()
+        def begin_close():
+            for s in sessions:
+                if s in getattr(self,'pending',{}):
+                    self.root.after_cancel(self.pending[s]);self.submit(s)
+            if require_saved:
+                pending=[s for s in sessions if s in self.revisions and (self.saved_rev.get(s,-1)<self.revisions[s] or s.validated_revision<self.revisions[s])]
+                broken=[s for s in pending if not s.thread.is_alive()]
+                errors=[s for s in sessions if s in self.revisions and s.validated_revision==self.revisions[s] and s.formula_errors]
+                if broken or errors:
+                    wait.grab_release();wait.destroy();self.stopping=False
+                    messagebox.showerror('Проверка документа','Не удалось подтвердить сохранение. Исправьте ошибки формул/документа или выберите «Не сохранять». Рабочая копия сохранена.');return
+                if pending:self.root.after(60,begin_close);return
+            for s in sessions:s.tasks.put(None)
+            finish()
+        begin_close()
     def decide_document(self,s,done):
         j=self.journal()
-        if not j or s.source not in j.dirty:
+        rel=s.source.relative_to(j.base) if j else None
+        renamed=j and j.saved_names.get(rel,j.origins.get(rel,rel))!=rel
+        if not j or s.source not in j.dirty and not renamed:
             done();return
         def result(choice):
             if choice=='cancel':return
             def complete():
-                if choice=='discard':j.restore_document(s.source)
+                if choice=='discard':
+                    try:
+                        restored=j.restore_document(s.source)
+                        if restored!=s.source:
+                            self.update_path_links(s.source,restored);s.source=restored
+                            self.selected[0]=str(restored)
+                            from studio import docs
+                            self.paths=docs(self.project/'Документы')
+                    except (OSError,ValueError) as e:messagebox.showerror('Отмена изменений',str(e));return
                 else:j.commit_document(s.source)
                 done()
             if choice=='save':self.save_session(s,lambda:(j.commit_document(s.source),done()))
@@ -178,14 +210,23 @@ class SaveDecisions:
             if not s.thread.is_alive():
                 release()
                 messagebox.showerror('Сохранение','Редактор документа завершился. Изменения оставлены в восстановлении.');return
-            if self.saved_rev.get(s,-1)!=self.revisions.get(s) or getattr(s,'row_operation_busy',False) or getattr(s,'row_operations',[]):
+            if self.saved_rev.get(s,-1)!=self.revisions.get(s) or s.validated_revision<self.revisions.get(s,0) or getattr(s,'row_operation_busy',False) or getattr(s,'row_operations',[]):
                 self.root.after(60,finish);return
+            if s.formula_errors:
+                release();messagebox.showerror('Проверка формул','В документе найдены ошибки формул: '+', '.join(s.formula_errors)+'. Исходный файл не заменён.');return
             try:
                 self.journal().publish_working(s.source)
             except OSError as e:release();messagebox.showerror('Сохранение',str(e));return
             release()
+            self.cache_final_pdf(s)
             done()
         finish()
+    def cache_final_pdf(self,s):
+        data,revision=getattr(s,'closed_pdf',(self.latest.get(s),self.revisions.get(s)))
+        if not data or s.validated_revision!=revision or s.formula_errors:return
+        from final_pdf_cache import FinalPDFCache
+        import threading
+        threading.Thread(target=FinalPDFCache().put,args=(s.source,data,s.clean_hash),daemon=True).start()
     def decide_project(self,done):
         j=self.journal()
         sessions=[s for s in [*self.sessions.values(),*getattr(self,'retiring_sessions',[])] if self.project and s.source.is_relative_to(self.project)]
@@ -198,6 +239,7 @@ class SaveDecisions:
                         from recovery_state import archive
                         archive(j)
                         for path in list(j.dirty):j.publish_working(path)
+                        for s in sessions:self.cache_final_pdf(s)
                     if choice=='discard':j.restore()
                 except OSError as e:
                     messagebox.showerror('Сохранение проекта','Не удалось завершить операцию. Рабочие копии сохранены для повторной попытки.\n'+str(e));return

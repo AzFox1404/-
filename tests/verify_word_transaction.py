@@ -27,13 +27,13 @@ with tempfile.TemporaryDirectory() as td:
     app.views['titleAddress'].set('Новый объект');app.perform_file_operation(source,'move',target)
     assert pump(root,ready),errors
     assert target.read_bytes()==original and s.source==target
-    # The user declines this document edit, but the filename remains a pending
-    # project operation. No content is silently saved by the rename.
+    # Discarding the document restores its name as well as its content.
     app.close_document()
     next(w for w in children(app.decision) if isinstance(w,ttk.Button) and w.cget('text')=='Не сохранять').invoke()
     assert pump(root,lambda:app.current is None and not app.stopping),errors
-    assert target.read_bytes()==original
-    app.open(target);s=app.current;assert pump(root,ready),errors
+    assert source.read_bytes()==original and not target.exists()
+    app.open(source);s=app.current;assert pump(root,ready),errors
+    app.perform_file_operation(source,'move',target)
     app.views['titleAddress'].set('Сохранённый объект');assert pump(root,ready),errors
     app.close()
     next(w for w in children(app.decision) if isinstance(w,ttk.Button) and w.cget('text')=='Сохранить').invoke()

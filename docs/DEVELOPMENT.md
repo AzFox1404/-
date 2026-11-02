@@ -20,6 +20,7 @@ python tools/check_project.py
 
 | Изменение | Проверка |
 |---|---|
+| Смешанный редактор / итоговый кэш / сборка | `verify_fast_preview.py`, `verify_final_pipeline.py`, `verify_export_snapshot.py`, `verify_make_registry.py`; правила в `docs/HYBRID_EDITOR.md` |
 | Переименование / сохранение / скорость переключения | `verify_rename_transaction.py` (Excel), `verify_word_transaction.py` (Word), `verify_journal_baseline.py` |
 | Захват мыши/стекло | `verify_home_drag_release.py`, `verify_glass_resize.py` |
 | Асинхронный PDF/автопрокрутка/fullscreen | `verify_async_pdf.py` |

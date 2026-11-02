@@ -151,24 +151,29 @@ class ProjectAnalysis:
             messagebox.showinfo('Проверка полей','\n'.join(plan['warnings']) or 'В этой форме пока не удалось уверенно определить поля.');return
         win=tk.Toplevel(self.root);win.title('Проверка распознанных полей');win.geometry('720x420')
         ttk.Label(win,text='\n'.join(plan['warnings']) or 'Проверьте значения распознанных полей перед заполнением.',wraplength=680,padding=12).pack(fill='x')
-        keys=list(session.spec);names={session.spec[k]['label']+' ['+k+']':k for k in keys}
-        choice=ttk.Combobox(win,values=list(names),state='readonly');choice.pack(fill='x',padx=12)
+        keys=list(session.spec)
+        names=[session.spec[k]['label'].strip().rstrip(':').strip() for k in keys]
+        choice=ttk.Combobox(win,values=names,state='readonly');choice.pack(fill='x',padx=12)
         old=tk.StringVar();new=tk.StringVar()
         ttk.Label(win,text='Текущее значение',padding=8).pack(anchor='w');ttk.Label(win,textvariable=old,wraplength=680).pack(fill='x',padx=12)
         ttk.Label(win,text='Предлагаемое значение — можно изменить',padding=8).pack(anchor='w');entry=ttk.Entry(win,textvariable=new);entry.pack(fill='x',padx=12)
         def load(e=None):
-            key=names.get(choice.get())
-            if not key:return
+            index=choice.current()
+            if index<0:return
+            key=keys[index]
             value=self.models[session].get(key,'');old.set(value)
             proposal=value.replace('к АООК','к АОСР') if key=='attachments' and any('В АОСР' in warning for warning in plan['warnings']) else value
             new.set(proposal)
         def apply():
-            key=names.get(choice.get())
-            if not key:return
+            index=choice.current()
+            if index<0:return
+            key=keys[index]
             if key in self.views:self.views[key].set(new.get())
             else:self.changed(session,key,new.get());self.build(1)
             old.set(new.get())
         choice.bind('<<ComboboxSelected>>',load)
-        ttk.Button(win,text='Применить к выбранному полю',command=apply).pack(anchor='e',padx=12,pady=14)
-        if names:choice.set(next((name for name,key in names.items() if key=='attachments' and plan['warnings']),next(iter(names))));load()
+        row=ttk.Frame(win);row.pack(fill='x',padx=12,pady=10)
+        button=self.icon_button(row,'checkall','Применить значение к выбранному полю',apply)
+        button.pack_forget();button.pack(side='right')
+        if names:choice.current(next((i for i,k in enumerate(keys) if k=='attachments' and plan['warnings']),0));load()
         self.paint(win)

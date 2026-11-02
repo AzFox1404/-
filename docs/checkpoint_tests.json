@@ -1,0 +1,25 @@
+{
+  "checkpoint": "hybrid-v1",
+  "date": "2026-11-03",
+  "scope": "safe mixed preview, verified final cache, rename rollback, export snapshots",
+  "checks": {
+    "verify_review_field_controls.py": "PASS: icon-only action, human labels, duplicate labels",
+    "verify_fast_preview.py": "PASS: unique anchors, ambiguity/overflow/rotation guards, source unchanged; 1.9-2.1 ms synthetic canvas update",
+    "verify_final_pipeline.py": "PASS: Excel formula results 3/7, merge preserved, error rejected, PDF/profile/content invalidation",
+    "verify_export_snapshot.py": "PASS: editable workbook and printed PDF agree; source unchanged; hash mismatch rejected",
+    "verify_register_sequences.py": "PASS: six edits, all 97/21 ordinals, pages and totals on temporary real-form copies",
+    "verify_make_registry.py": "PASS: rebuilt ordinals, leaves/ranges, no general summary, one-page PDF",
+    "verify_word_transaction.py": "PASS: unsaved rename, content+name discard, explicit project save",
+    "verify_rename_transaction.py": "PASS: live session identity, confirmation, saved edits and whole project rollback",
+    "verify_journal_baseline.py": "PASS: document checkpoint filename, persisted recovery and immutable project baseline",
+    "verify_save_validation.py": "PASS: rejected save leaves worker alive and source intact",
+    "verify_async_pdf.py": "PASS: async process, warm bitmap cache, scrolling, fullscreen modal; heartbeat gap 204 ms"
+  },
+  "limits": [
+    "Canvas layer is preliminary and never printed",
+    "Complex layout and formulas remain authoritative in Office",
+    "Synthetic single-field timings are not total application speedup",
+    "No new dependency installation",
+    "No access to subscription quota telemetry"
+  ]
+}

@@ -4,6 +4,9 @@ $ErrorActionPreference='Stop'
 [Console]::InputEncoding=[Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
 function Send($object){[Console]::WriteLine((ConvertTo-Json -InputObject $object -Compress -Depth 6))}
+function FormulaErrors{
+ if($excel){GetFormulaErrors $doc}
+}
 function DisplayDate($iso,$sample){
  if(!$iso){return ''}
  $date=[datetime]::ParseExact($iso,'yyyy-MM-dd',[Globalization.CultureInfo]::InvariantCulture)
@@ -24,6 +27,7 @@ function IsoDate($text){
 . (Join-Path $PSScriptRoot 'RegisterRows.ps1')
 . (Join-Path $PSScriptRoot 'WordFields.ps1')
 . (Join-Path $PSScriptRoot 'ReviewHighlight.ps1')
+. (Join-Path $PSScriptRoot 'FormulaValidation.ps1')
 $probeBook=$null;$pinned=$false;$app=$null;$doc=$null
 try{
  $excel=[IO.Path]::GetExtension($WorkFile) -in '.xls','.xlsx'
@@ -126,14 +130,14 @@ try{
     $materialCell=BoundCell (FieldName 'materials' 0);if(!$materialCell){$materialCell=$sheet.Range($bindings.materials[0])};$materialCell.Value2=[regex]::Replace($original.materials,'(?<= от )\d{2}\.\d{2}\.\d{4}',$referenceDate)
    }
    if(!$cleanReady -or !(Test-Path -LiteralPath ([string]$req.pdf))){
-   if(!$excel){UpdateWordTotals}elseif($special.Keys -match '^row'){$app.CalculateFull()}
+   if(!$excel){UpdateWordTotals}elseif($special.Keys -match '^row'){$app.CalculateFull()}else{$app.Calculate()}
    if(!$excel -and $PreparedFile){$format=if([IO.Path]::GetExtension($WorkFile) -eq '.doc'){0}else{16};$doc.SaveAs2($WorkFile,$format);$PreparedFile=''}else{$doc.Save()}
    if($excel){$doc.ExportAsFixedFormat(0,[string]$req.pdf)}else{$doc.ExportAsFixedFormat([string]$req.pdf,17)}
     $cleanReady=$true
    }
    # The clean preview is ready now. Let Tk display it before the more expensive
    # coloured review-copy export, without allowing review colours into the file.
-   Send @{cleanReady=$true}
+   Send @{cleanReady=$true;formulaErrors=@(FormulaErrors)}
    $hasReview=ExportReviewPdf $req
    Send @{ok=$true;hasReview=$hasReview}
   }catch{Send @{error=$_.Exception.Message}}

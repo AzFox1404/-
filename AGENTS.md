@@ -5,7 +5,7 @@
 Repository: `https://github.com/AzFox1404/-`, branch `main`.
 This directory is the user's working checkout. The repository is the source of code history; `Рабочая папка ИД/` is private runtime data, not source code.
 
-Read `docs/PROJECT_MAP.md` and `docs/STATUS.md` first. Read `docs/REQUIREMENTS.md` only for affected behaviour. Search the relevant module/function with `rg`; do not repeatedly scan client directories, run OCR, export all PDFs or reread the entire development history.
+Read `docs/PROJECT_MAP.md` and `docs/STATUS.md` first. For performance/preview/save work use `docs/HYBRID_EDITOR.md`, not another broad investigation. Read `docs/REQUIREMENTS.md` only for affected behaviour. Search the relevant module/function with `rg`; do not repeatedly scan client directories, run OCR, export all PDFs or reread the entire development history.
 
 ## Sync contract
 
@@ -27,7 +27,7 @@ There is no background folder watcher. Synchronization occurs while handling an 
 - Preserve text and view state when hiding panels. Additional windows work in fullscreen; the application never remains globally topmost.
 - Never block Tk with Office, OCR, PDF rendering, a thread join or a synchronous worker wait.
 - Pane drag must release mouse capture over glass, the line, original controls, Escape, unmap, focus loss and destruction. Preserve the regression checks for these routes.
-- Edit only recovery working copies. Rename a source by remapping its live session and journal; never stop/reopen or save fields merely to rename. Keep immutable project-opening baseline separate from document-save checkpoints. Whole-project discard restores that baseline, including names and already confirmed per-document saves. Preserve the Excel/Word transaction regression tests.
+- Edit only recovery working copies. Rename a source by remapping its live session and journal; never stop/reopen or save fields merely to rename. Keep immutable project-opening baseline separate from document-save checkpoints. Document discard also restores its last confirmed filename; cancel-exit retains the draft. Whole-project discard restores that baseline, including names and already confirmed per-document saves. Preserve the Excel/Word transaction regression tests.
 - Keep at most two warm Office sessions; emit clean PDF before coloured review. Do not mark repeated identical values as edits.
 - Queue registry mutations before waiting for PDF; first-position insertion is before the selected first row. Renumber sections without counting headings.
 - User documents and original sample folders must never be modified by tests. Use temporary copies.
@@ -41,3 +41,5 @@ Runtime modules and PowerShell workers live together in `app/`; ROOT is the proj
 Do not publish `.project-local.json`, `.local_notes`, user projects, working copies, OCR caches, source templates, screenshots or personal investigation notes. Existing ignored Russian rules/history files remain local references when a specific case requires them. Do not replace those user files with Git versions.
 
 Record significant changes in `docs/STATUS.md`/`docs/CHANGELOG.md`; update the module map when adding or moving responsibilities. Current EXE packaging is pending; include the isolated PDF worker and review dependency licenses before distribution.
+
+Fast preview is Canvas-only, unique-anchor and fit checked. Never publish it or cache it as final. Final exports must pass formula validation and snapshot SHA matching. Use only verified environment/content keyed final PDFs; never the old print-v1 cache.

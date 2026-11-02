@@ -342,8 +342,9 @@ class Interface:
         s=self.current
         if not s or not self.project or not s.copy.is_relative_to(self.project):
             messagebox.showinfo('Бюро ИД','Откройте документ проекта.');return None
-        if self.saved_rev.get(s,-1)!=self.revisions.get(s) or s not in self.latest:
+        if self.saved_rev.get(s,-1)!=self.revisions.get(s) or s not in self.latest or s.validated_revision!=self.revisions.get(s):
             messagebox.showinfo('Бюро ИД','Дождитесь обновления предпросмотра.');return None
+        if s.formula_errors:messagebox.showerror('Проверка формул','Исправьте ошибки формул: '+', '.join(s.formula_errors));return None
         return s
     def export_current(self):
         import shutil

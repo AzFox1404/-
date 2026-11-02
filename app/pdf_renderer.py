@@ -10,6 +10,8 @@ class PDFRenderer:
   self.generation=generation;self.jobs.put(dict(op='open',source=source if isinstance(source,bytes) else str(source),generation=generation))
  def page(self,generation,epoch,page,zoom,rotation):
   self.jobs.put(dict(op='page',generation=generation,epoch=epoch,page=page,zoom=zoom,rotation=rotation))
+ def locate(self,generation,values):
+  self.jobs.put(dict(op='locate',generation=generation,values=values))
  def close(self):
   self.closed=True;self.jobs.put(None)
   p=self.process

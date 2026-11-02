@@ -39,12 +39,18 @@ class Session:
         self.tasks = queue.Queue()
         self.preview_context={};self.review_pdf=None
         self.structural_review=False
+        self.validated_revision=-1;self.formula_errors=[];self.clean_hash=None;self.verified_values=None;self.timings=[]
         self.thread = threading.Thread(target=self.run, daemon=True)
         self.thread.start()
 
     def run(self):
         process = None
         try:
+            import time
+            started=time.perf_counter()
+            from final_pdf_cache import FinalPDFCache,digest
+            cached=FinalPDFCache().get(self.source)
+            if cached:self.events.put((self,'clean',(0,cached)))
             from office_forms import extra_fields
             from act_layout import act_rows
             prepared=None
@@ -94,6 +100,7 @@ class Session:
                             if isinstance(newer,tuple):job=newer
                             else:held=newer;break
                     if job is None: break
+                    started=time.perf_counter()
                     if isinstance(job,dict):
                         process.stdin.write(json.dumps({'delete' if job.get('delete') else 'insert':job['row']})+'\n');process.stdin.flush();response=receive();inserted_row=response.get('row',job['row']+1)
                         if self.copy.suffix.lower() in ('.doc','.docx'):
@@ -122,8 +129,15 @@ class Session:
                 process.stdin.flush()
                 response=receive()
                 if response.get('cleanReady'):
-                    self.events.put((self,'clean',(revision,pdf.read_bytes())))
+                    data=pdf.read_bytes();self.clean_hash=digest(self.copy)
+                    self.formula_errors=response.get('formulaErrors',[]);self.validated_revision=revision
+                    self.verified_values=(revision,dict(fields))
+                    self.timings.append(dict(revision=revision,clean_ms=round((time.perf_counter()-started)*1000)))
+                    self.timings=self.timings[-32:]
+                    self.events.put((self,'clean',(revision,data)))
                     response=receive()
+                    self.timings[-1]['review_ms']=round((time.perf_counter()-started)*1000)-self.timings[-1]['clean_ms']
+                started=time.perf_counter()
                 self.review_pdf=(revision,review.read_bytes()) if response.get('hasReview') else None
                 if hasattr(self,'analysis'):save_word_plan(self.copy,self.analysis,self.spec,fields)
                 self.events.put((self,'pdf',(revision,pdf.read_bytes())))
@@ -384,6 +398,8 @@ class Workspace:
         review=getattr(self.current,'review_pdf',None)
         if review and review[0]==self.saved_rev.get(self.current):data=review[1]
         view=self.pdf_viewer;had_pages=bool(view.pages)
+        snapshot=getattr(self.current,'verified_values',None)
+        view.set_quick_model(snapshot[1] if snapshot and snapshot[0]==self.saved_rev.get(self.current) else {},getattr(self.current,'labels',{}))
         page=view.page_at(view.canvas.canvasy(0)) if had_pages else 0
         fraction=(view.canvas.canvasy(0)-view.pages[page][0])/view.pages[page][2] if had_pages else 0
         view.show(data,page)

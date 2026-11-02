@@ -15,6 +15,7 @@ class PagePreview(ttk.Frame):
         self.app=app;self.path=None;self.number=0;self.rotations={};self.zoom=70;self.image=None
         self.pages=[];self.images={};self._pending=None;self._sizes=None;self._zoom_job=None;self._wanted_zoom=None;self._text_cache={}
         self._bitmap_cache=OrderedDict();self._bitmap_bytes=0
+        self.quick_values={};self.quick_anchors={};self.quick_changes={};self._quick_requested=False;self._quick_fonts={}
         self.renderer=PDFRenderer();self._generation=0;self._epoch=0;self._requested=set();self._render_poll=None
         tools=ttk.Frame(self);tools.pack(fill='x')
         for key,label,fn in [('rotateleft','Повернуть текущую страницу на 90° влево',lambda:self.rotate(-90)),
@@ -24,6 +25,7 @@ class PagePreview(ttk.Frame):
         self.scale=ttk.Combobox(tools,values=(35,50,70,85,100,125,150,200),state='readonly',width=5)
         self.scale.set(self.zoom);self.scale.pack(side='right');self.scale.bind('<<ComboboxSelected>>',lambda e:self.set_zoom(int(self.scale.get())))
         area=ttk.Frame(self);area.pack(fill='both',expand=True)
+        self.quick_notice=ttk.Label(self,text='Предварительный вид · вёрстка уточняется',padding=(6,2));self.quick_area=area
         self.canvas=tk.Canvas(area,bg='#e6ded8',highlightthickness=0,yscrollincrement=1)
         x=ttk.Scrollbar(area,orient='horizontal',command=self.canvas.xview)
         y=ttk.Scrollbar(area,command=self.canvas.yview)
@@ -55,6 +57,7 @@ class PagePreview(ttk.Frame):
             # Release native Tk resources here, not later in a background GC
             # triggered while an Office worker parses the next document.
             self.images.clear();self._bitmap_cache.clear();self.image=None
+            self._quick_fonts.clear()
             self.page_text=None;self.selection.message=None
         if event.widget is self and self._zoom_job is not None:
             self.after_cancel(self._zoom_job);self._zoom_job=None
@@ -90,6 +93,7 @@ class PagePreview(ttk.Frame):
         changed=source!=self.path
         self.path=source;self.number=number;self.rotations=rotations if rotations is not None else {}
         if changed:
+            self.quick_anchors={};self.quick_changes={};self._quick_requested=False;self.quick_notice.pack_forget()
             self._restore_fraction=None
             self._sizes=None;self._text_cache.clear();self._bitmap_cache.clear();self._bitmap_bytes=0
             self._generation+=1;self.pages=[];self.images.clear();self.canvas.delete('all');self.selection.reset(source)
@@ -188,6 +192,50 @@ class PagePreview(ttk.Frame):
         self.number=self.page_at(top+min(80,max(0,bottom-top-1)))
         self.update_label()
         self.selection.highlight()
+        self.draw_quick()
+
+    def set_quick_model(self,values,labels):
+        from fast_preview import eligible
+        values=eligible(values,labels)
+        if values!=self.quick_values:
+            self.quick_values=values;self.quick_anchors={};self.quick_changes={};self._quick_requested=False
+            self.quick_notice.pack_forget()
+            if values and self._sizes is not None and self.path is not None:
+                self._quick_requested=True;self.renderer.locate(self._generation,values)
+
+    def quick_field(self,key,value):
+        from fast_preview import family
+        from tkinter import font
+        def fallback():
+            self.quick_changes.pop(key,None);self.draw_quick();return False
+        a=self.quick_anchors.get(key)
+        if not a or '\n' in value or len(value)>80 or self.rotations.get(str(a['page']),0):return fallback()
+        if a['page']>=len(self.pages):return fallback()
+        fam=family(a['font'])
+        if not fam:return fallback()
+        size=max(1,round(a['size']*self.zoom/75));style=(fam,size,a['flags'])
+        if style not in self._quick_fonts:self._quick_fonts[style]=font.Font(self.canvas,family=fam,size=-size,weight='bold' if a['flags']&16 else 'normal',slant='italic' if a['flags']&2 else 'roman')
+        width=(a['rect'][2]-a['rect'][0])*self.pages[a['page']][1]
+        if self._quick_fonts[style].measure(value)>width+.5:return fallback()
+        if value==self.quick_values.get(key):self.quick_changes.pop(key,None)
+        else:self.quick_changes[key]=value
+        self.draw_quick();return True
+
+    def draw_quick(self):
+        from fast_preview import family
+        from tkinter import font
+        self.canvas.delete('quick-edit')
+        if not self.quick_changes:self.quick_notice.pack_forget();return
+        self.quick_notice.pack(fill='x',before=self.quick_area)
+        for key,value in self.quick_changes.items():
+            a=self.quick_anchors.get(key)
+            if not a or a['page']>=len(self.pages) or self.rotations.get(str(a['page']),0):continue
+            top,w,h,_=self.pages[a['page']];x0,y0,x1,y1=a['rect'];size=max(1,round(a['size']*self.zoom/75));style=(family(a['font']),size,a['flags'])
+            if style not in self._quick_fonts:self._quick_fonts[style]=font.Font(self.canvas,family=style[0],size=-size,weight='bold' if a['flags']&16 else 'normal',slant='italic' if a['flags']&2 else 'roman')
+            f=self._quick_fonts[style]
+            if f.measure(value)>(x1-x0)*w+.5:continue
+            self.canvas.create_rectangle(8+x0*w,top+y0*h,8+x1*w,top+y1*h,fill='white',outline='',tags='quick-edit')
+            self.canvas.create_text(8+x0*w,top+(y0+y1)*h/2,text=value,anchor='w',font=f,fill='#bb2424',tags='quick-edit')
 
     def poll_renderer(self):
         self._render_poll=None
@@ -206,7 +254,10 @@ class PagePreview(ttk.Frame):
                         page=min(restore[1],len(self.pages)-1);top,w,h,_=self.pages[page]
                         self.canvas.yview_moveto((top+restore[2]*h)/self.height);self.render_visible()
                     self._restore_fraction=None
+                    if self.quick_values and not self._quick_requested:
+                        self._quick_requested=True;self.renderer.locate(self._generation,self.quick_values)
                 else:self.page_text.set('Пустой PDF')
+            elif result['op']=='locate':self.quick_anchors=result['anchors']
             elif result['op']=='page' and result['epoch']==self._epoch:
                 n=result['page'];self._requested.discard((self._epoch,n));key=(n,result['zoom'],result['rotation'])
                 image=Image.frombytes('RGB',result['size'],result['rgb']);photo=ImageTk.PhotoImage(image,master=self.canvas);image.close()

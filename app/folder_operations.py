@@ -81,6 +81,9 @@ class FolderOperations:
                     for s in affected:
                         self.sessions.pop(s.source,None)
                         s.source=target/s.source.relative_to(source);self.sessions[s.source]=s
+                        self.journal().dirty.add(s.source)
+                    from recovery_state import persist
+                    persist(self.journal())
                 else:
                     if source.is_dir():shutil.rmtree(source)
                     else:source.unlink()

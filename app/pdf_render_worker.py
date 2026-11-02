@@ -12,6 +12,9 @@ def run():
     if doc:doc.close()
     source=req['source'];doc=fitz.open(stream=source,filetype='pdf') if isinstance(source,bytes) else fitz.open(source)
     result=dict(op='open',generation=req['generation'],sizes=[tuple(doc[n].rect)[2:] for n in range(len(doc))])
+   elif req['op']=='locate':
+    from fast_preview import locate
+    result=dict(op='locate',generation=req['generation'],anchors=locate(doc,req['values']))
    else:
     page=doc[req['page']];page.set_rotation((page.rotation+req['rotation'])%360)
     try:

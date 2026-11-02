@@ -626,6 +626,9 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         before=self.revisions[s]
         super().changed(s,key,v)
         if self.revisions[s]!=before:
+            view=getattr(self,'pdf_viewer',None)
+            if s is self.current and not getattr(self,'reference_path',None) and view is not None and view.winfo_exists() and view.quick_field(key,v):
+                self.root.after_cancel(self.pending[s]);self.pending[s]=self.root.after(900,lambda:self.submit(s))
             j=self.journal();j.dirty.add(s.source)
             j.drafts[str(s.source.relative_to(j.base))]=dict(self.models[s])
             from recovery_state import persist

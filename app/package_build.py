@@ -183,7 +183,7 @@ def spans(items,counts,section_numbers):
         rows.append(dict(item=it,count=count,span=str(first) if first==end else f'{first}-{end}',title=it.title,number=it.number,date=it.date))
     return rows
 
-def render(path,temp,cache):
+def render(path,temp,cache,editable_output=None):
     if path in cache:return cache[path]
     if path.suffix.lower()=='.pdf':return path.read_bytes()
     if path.suffix.lower() in ('.jpg','.jpeg'):
@@ -191,13 +191,20 @@ def render(path,temp,cache):
         buf=BytesIO()
         with Image.open(path) as im:im.convert('RGB').save(buf,'PDF')
         return buf.getvalue()
+    from final_pdf_cache import FinalPDFCache
+    final=FinalPDFCache();ready=final.get(path)
+    if ready is not None:return ready
     work=Path(tempfile.mkdtemp(dir=temp))/path.name;shutil.copy2(path,work)
     events=queue.Queue();worker=Session(work,events,prepared=True)
     try:
         while True:
             _,kind,value=events.get(timeout=180)
             if kind=='error':raise ValueError(f'{path.name}: {value}')
-            if kind=='pdf':return value[1]
+            if kind=='pdf':
+                if worker.formula_errors:raise ValueError('Ошибки формул: '+', '.join(worker.formula_errors))
+                if editable_output is not None:shutil.copy2(work,editable_output)
+                final.put(editable_output or path,value[1],worker.clean_hash)
+                return value[1]
     finally:worker.tasks.put(None);worker.thread.join(30)
 
 def set_print_width(path):
@@ -234,7 +241,7 @@ def make_registry(source,out,pdf,rows,address=''):
         set_print_width(out)
     finally:payload.unlink(missing_ok=True)
 
-def publish(project,selected,target,cache,options,progress):
+def publish(project,selected,target,cache,options,progress,editable_sources=None):
     target=Path(target);target.mkdir(parents=True,exist_ok=True)
     if target.resolve().is_relative_to(project.resolve()):raise ValueError('Выберите папку выгрузки вне проекта.')
     name=project.name
@@ -248,24 +255,32 @@ def publish(project,selected,target,cache,options,progress):
     with tempfile.TemporaryDirectory(dir=target,prefix='.БюроИД-') as stage:
         stage=Path(stage);work=stage/'temp';work.mkdir()
         edits=stage/name;prints=stage/(name+' для печати');edits.mkdir();prints.mkdir()
-        counts={};rendered={}
+        counts={};rendered={};snapshots={};snapshot_cache={}
+        for p in set(i.path for i in sources):
+            rel=p.relative_to(project/'Документы') if p.is_relative_to(project/'Документы') else Path(p.name)
+            dest=edits/rel;dest.parent.mkdir(parents=True,exist_ok=True)
+            live=(editable_sources or {}).get(p)
+            shutil.copy2(live[0] if live else p,dest)
+            if live and digest(dest)!=live[1]:raise ValueError('Документ изменился во время выгрузки. Повторите сборку: '+p.name)
+            snapshots[p]=dest
+            if p in cache:snapshot_cache[dest]=cache[p]
+            elif not live:
+                from final_pdf_cache import FinalPDFCache
+                pdf=FinalPDFCache().get(p)
+                if pdf is not None:snapshot_cache[dest]=pdf
         for i in sources:
             if i.path in rendered or (i.role=='Реестр' and options['rebuild']):continue
             progress('Подготовка: '+i.path.name)
-            if i.path.suffix.lower()=='.pdf':pdf=i.path
+            if i.path.suffix.lower()=='.pdf':pdf=snapshots[i.path]
             else:
-                cache_dir=project/'Кэш PDF';cache_dir.mkdir(exist_ok=True)
-                pdf=cache_dir/(digest(i.path)+'-print-v1.pdf')
-                if i.path in cache or not pdf.exists():
-                    data=render(i.path,work,cache)
-                    with tempfile.NamedTemporaryFile(dir=cache_dir,delete=False) as f:f.write(data)
-                    Path(f.name).replace(pdf)
+                pdf=work/(__import__('uuid').uuid4().hex+'.pdf')
+                data=render(snapshots[i.path],work,snapshot_cache,editable_output=snapshots[i.path]);pdf.write_bytes(data)
             rendered[i.path]=pdf
             counts[i.path]=len(PdfReader(pdf).pages)
-        for p in set(i.path for i in sources if i.role!='Реестр' or not options['rebuild']):
-            rel=p.relative_to(project/'Документы');dest=edits/rel;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,dest)
-            if dest.suffix.lower()=='.xlsx' and any(i.path==p and i.role in ('Реестр','Приложение') for i in sources):
-                set_print_width(dest)
+        registry_source=None
+        if registers:
+            registry_source=work/('registry-template'+registers[0].path.suffix)
+            shutil.copy2(snapshots[registers[0].path],registry_source)
         def build_one(group,pdir,stem,overall):
             pdir.mkdir(parents=True,exist_ok=True)
             group=ordered(group,options['dedup'])
@@ -273,7 +288,7 @@ def publish(project,selected,target,cache,options,progress):
             regpdf=None
             if registers and not options['rebuild']:
                 existing=[]
-                for raw in book_rows(registers[0].path)[7:]:
+                for raw in book_rows(snapshots[registers[0].path])[7:]:
                     if len(raw)<6 or not isinstance(raw[0],(int,float)) or not raw[1] or str(raw[1])=='Всего позиций':continue
                     existing.append(raw)
                 if len(existing)!=len(rows) or any(str(old[5])!=row['span'] or int(old[4] or 0)!=row['count'] or
@@ -284,7 +299,7 @@ def publish(project,selected,target,cache,options,progress):
             if registers and options['rebuild']:
                 excel=(edits/(registers[0].path.relative_to(project/'Документы') if registers[0].path.is_relative_to(project/'Документы') else Path('Реестр.xlsx'))) if overall else edits/'Раздельные комплекты'/stem/'Реестр.xlsx'
                 excel.parent.mkdir(parents=True,exist_ok=True);regpdf=work/(safe(stem)+'-registry.pdf')
-                progress('Пересоставление реестра: '+stem);make_registry(registers[0].path,excel,regpdf,rows)
+                progress('Пересоставление реестра: '+stem);make_registry(registry_source,excel,regpdf,rows)
             joined=options['combined'] if overall else options['separate']
             writer=PdfWriter() if joined else None
             for it in group:
@@ -340,7 +355,6 @@ def measure_selection(project,items,cache,options,cancel,progress):
     unique=list(dict.fromkeys(it.path for it in items))
     with tempfile.TemporaryDirectory(prefix='bureau-count-') as tmp:
         tmp=Path(tmp)
-        cachedir=project/'Кэш PDF';cachedir.mkdir(exist_ok=True)
         for ix,path in enumerate(unique,1):
             if cancel.is_set():return None
             if any(it.path==path and it.role=='Реестр' for it in items) and options['rebuild']:continue
@@ -348,10 +362,7 @@ def measure_selection(project,items,cache,options,cancel,progress):
             if path in cache:data=cache[path]
             elif path.suffix.lower()=='.pdf':data=path.read_bytes()
             else:
-                out=cachedir/(digest(path)+'-print-v1.pdf')
-                if not out.exists():
-                    data=render(path,tmp,cache);temp=out.with_suffix('.count.tmp');temp.write_bytes(data);temp.replace(out)
-                data=out.read_bytes()
+                data=render(path,tmp,cache)
             counts[path]=len(PdfReader(BytesIO(data)).pages)
         def group_total(group,stem):
             group=ordered(group,options['dedup']);rows=spans(group,counts,options['section_numbers'])
@@ -459,7 +470,7 @@ class PackageDialog:
         self.totals_text.set(f'Расчёт страниц · Примерно {self.stats_estimate:.0f} сек.')
         state={'progress':'Подготовка','completed':0}
 
-        cache={s.source:data for s,data in self.app.latest.items() if self.app.saved_rev.get(s,-1)==self.app.revisions.get(s)}
+        cache={s.source:data for s,data in self.app.latest.items() if self.app.saved_rev.get(s,-1)==self.app.revisions.get(s)==s.validated_revision and not s.formula_errors}
         def work():
             try:events.put(('done',measure_selection(self.app.project,selected,cache,opts,self.stats_cancel,lambda x:events.put(('status',x)))))
             except Exception as exc:events.put(('error',str(exc)))
@@ -582,7 +593,7 @@ class PackageDialog:
         if check_package(self.app,selected):return
         for it in selected:
             s=self.app.sessions.get(it.path)
-            if s and self.app.saved_rev.get(s,-1)!=self.app.revisions[s]:
+            if s and (self.app.saved_rev.get(s,-1)!=self.app.revisions[s] or s.validated_revision!=self.app.revisions[s] or s.formula_errors):
                 messagebox.showinfo('Сборка','Дождитесь сохранения документа: '+it.path.name);return
         if options['rebuild'] and not any(i.role=='Реестр' for i in selected):
             source=next((self.app.catalog_dir/'Шаблоны').rglob('Шаблон Реестр.xlsx'),None)
@@ -592,11 +603,12 @@ class PackageDialog:
         if not target:return
         project=self.app.project
         cache={}
-        cache.update({s.source:data for s,data in self.app.latest.items() if self.app.saved_rev.get(s,-1)==self.app.revisions.get(s)})
+        cache.update({s.source:data for s,data in self.app.latest.items() if self.app.saved_rev.get(s,-1)==self.app.revisions.get(s)==s.validated_revision and not s.formula_errors})
+        editable_sources={s.source:(s.copy,s.clean_hash) for s in self.app.sessions.values() if s.source in cache}
         events=queue.Queue();self.busy=True;self.go.state(['disabled'])
         self.window.protocol('WM_DELETE_WINDOW',lambda:messagebox.showinfo('Сборка','Идёт сохранение комплекта.'))
         def worker():
-            try:events.put(('done',publish(project,selected,target,cache,options,lambda msg:events.put(('status',msg)))))
+            try:events.put(('done',publish(project,selected,target,cache,options,lambda msg:events.put(('status',msg)),editable_sources)))
             except Exception as e:events.put(('error',str(e)))
         def poll():
             while not events.empty():
@@ -605,12 +617,6 @@ class PackageDialog:
                 elif kind=='error':
                     self.busy=False;self.go.state(['!disabled']);self.window.protocol('WM_DELETE_WINDOW',self.window.destroy);messagebox.showerror('Сборка',data);return
                 else:self.window.destroy();messagebox.showinfo('Выгрузка завершена',str(data));return
-            if epoch==self.stats_epoch:
-                elapsed=time.monotonic()-self.stats_started
-                completed=state['completed']
-                estimate=self.stats_estimate if not completed else max(self.stats_estimate,elapsed/max(1,completed)*total)
-                remaining=max(1,estimate-elapsed)
-                self.totals_text.set(f"{state['progress']} · Осталось примерно {remaining:.0f} сек. · Прошло {elapsed:.0f} сек.")
             self.window.after(120,poll)
         threading.Thread(target=worker,daemon=True).start();poll()
 
