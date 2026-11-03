@@ -24,6 +24,7 @@ def normal_window(window):
         put(hwnd,-20,(get(hwnd,-20)|0x00040000)&~0x80)
         u.SetWindowPos.argtypes=[W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT]
         u.SetWindowPos(hwnd,C.c_void_p(-2),0,0,0,0,0x33)
+        if getattr(window,'app_caption',None):window.app_caption.sync()
     window.after_idle(apply)
     window.bind("<Map>",lambda e:window.after_idle(apply) if e.widget is window else None,add="+")
 
@@ -68,4 +69,5 @@ def close_only(window):
             put(hwnd,-16,wanted)
             u.SetWindowPos.argtypes=[W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT]
             u.SetWindowPos(hwnd,None,0,0,0,0,0x37)
+        if getattr(window,'app_caption',None):window.app_caption.sync()
     window.after_idle(apply);window.bind('<Map>',lambda e:window.after_idle(apply) if e.widget is window else None,add='+')

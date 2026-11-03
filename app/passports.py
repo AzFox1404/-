@@ -17,6 +17,9 @@ DATE=r'(\d{1,2})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{4})(?!\d)'
 MONTHS='января февраля марта апреля мая июня июля августа сентября октября ноября декабря'.split()
 
 def propose(text):
+    # Windows OCR may read the number sign as a separate "NQ" token.
+    # Only normalize that marker before a numeric value; never alter the PDF.
+    text=re.sub(r'\bNQ(?=\s+\d)', '№',text,flags=re.I)
     text=re.sub(r'(?m)^\s*\d{1,2}\.\d{1,2}\.\d{4}\s*,[^\n]*','',text)
     m=HEADER.search(text)
     if not m:return None

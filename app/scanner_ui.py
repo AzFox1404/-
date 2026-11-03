@@ -8,9 +8,8 @@ import tempfile
 import tkinter as tk
 from tkinter import ttk, filedialog
 from app_dialogs import messagebox
-from PIL import ImageTk
-import pypdfium2 as pdfium
-from passports import inspect,save_records,TYPES
+from passports import save_records,TYPES
+from passport_process import inspect
 
 def scanner(app,files=None,destination=None):
     if files is None:files=filedialog.askopenfilenames(parent=app.root,title='Паспорта и сертификаты',filetypes=[('PDF, JPEG или ZIP','*.pdf *.jpg *.jpeg *.zip')])
@@ -25,14 +24,16 @@ def scanner(app,files=None,destination=None):
     def notify(s):
         if cancelled.is_set():raise RuntimeError('Отменено пользователем')
         events.put(('status',s))
+    cache=app.catalog_dir/'Кэш распознавания'
     def work():
-        try:events.put(('ready',inspect(list(map(Path,files)),Path(tmp.name),notify,app.catalog_dir/'Кэш распознавания')))
+        try:events.put(('ready',inspect(list(map(Path,files)),Path(tmp.name),notify,cache,cancelled)))
         except Exception as exc:events.put(('error',str(exc)))
         finally:
             if cancelled.is_set():tmp.cleanup()
     threading.Thread(target=work,daemon=True).start()
     win.protocol('WM_DELETE_WINDOW',lambda:(cancelled.set(),win.destroy()))
     def poll():
+        if cancelled.is_set() or not win.winfo_exists():return
         while not events.empty():
             kind,data=events.get()
             if cancelled.is_set():
@@ -41,8 +42,14 @@ def scanner(app,files=None,destination=None):
             if kind=='status':status.set(data)
             elif kind=='error':
                 tmp.cleanup();win.destroy();messagebox.showerror('Распознавание',data);return
-            else:review(data);return
-        app.root.after(100,poll)
+            else:
+                if not data:
+                    tmp.cleanup();win.destroy();messagebox.showerror('Распознавание','В источнике нет документов.');return
+                try:review(data)
+                except Exception as exc:
+                    win.destroy();tmp.cleanup();messagebox.showerror('Просмотр паспортов',str(exc))
+                return
+        win.after(100,poll)
     def review(records):
         status.set('Проверьте границы страниц, номер и дату. Нераспознанные значения можно дописать.')
         win.protocol('WM_DELETE_WINDOW',lambda:(win.destroy(),tmp.cleanup()))

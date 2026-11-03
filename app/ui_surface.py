@@ -33,44 +33,27 @@ def rounded_frame(window):
     u=C.windll.user32;g=C.windll.gdi32
     u.GetParent.argtypes=[W.HWND];u.GetParent.restype=W.HWND
     hwnd=u.GetParent(window.winfo_id()) or window.winfo_id()
-    u.GetWindowLongPtrW.argtypes=[W.HWND,C.c_int];u.GetWindowLongPtrW.restype=C.c_ssize_t
-    u.SetWindowLongPtrW.argtypes=[W.HWND,C.c_int,C.c_ssize_t];u.SetWindowLongPtrW.restype=C.c_ssize_t
-    u.CallWindowProcW.argtypes=[C.c_void_p,W.HWND,W.UINT,W.WPARAM,W.LPARAM];u.CallWindowProcW.restype=C.c_ssize_t
     u.GetWindowRect.argtypes=[W.HWND,C.POINTER(W.RECT)]
-    u.IsZoomed.argtypes=[W.HWND];u.IsWindow.argtypes=[W.HWND]
+    u.IsZoomed.argtypes=[W.HWND]
     u.SetWindowPos.argtypes=[W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT]
-    previous=getattr(window,'_client_proc',None)
-    if previous and previous[2]!=hwnd:
-        cb,prior,handle=previous
-        if u.IsWindow(handle) and u.GetWindowLongPtrW(handle,-4)==C.cast(cb,C.c_void_p).value:u.SetWindowLongPtrW(handle,-4,prior)
-        window._client_proc=None
-    if not getattr(window,'_client_proc',None):
-        old=u.GetWindowLongPtrW(hwnd,-4)
-        proc_type=C.WINFUNCTYPE(C.c_ssize_t,W.HWND,W.UINT,W.WPARAM,W.LPARAM)
-        def proc(handle,msg,wp,lp):
-            try:
-                if msg==0x84 and not u.IsZoomed(handle) and not getattr(window,'_frame_full',False):
-                    r=W.RECT();u.GetWindowRect(handle,C.byref(r));x=C.c_short(lp&65535).value;y=C.c_short((lp>>16)&65535).value
-                    ix,iy,iw,ih=getattr(window,'_client_bounds',(0,0,r.right-r.left,r.bottom-r.top))
-                    if y<r.top+iy+12:
-                        if x<r.left+ix+12:return 13
-                        if x>=r.left+ix+iw-12:return 14
-                    if y>=r.top+iy+ih-12:
-                        if x<r.left+ix+12:return 16
-                        if x>=r.left+ix+iw-12:return 17
-                    left=x<r.left+ix+3;right=x>=r.left+ix+iw-3;top=y<r.top+iy+3;bottom=y>=r.top+iy+ih-3
-                    if top:return 13 if left else 14 if right else 12
-                    if bottom:return 16 if left else 17 if right else 15
-                    if left:return 10
-                    if right:return 11
-            except (Exception,):pass
-            return u.CallWindowProcW(old,handle,msg,wp,lp)
-        callback=proc_type(proc);window._client_proc=(callback,old,hwnd)
-        u.SetWindowLongPtrW(hwnd,-4,C.cast(callback,C.c_void_p).value)
-        u.SetWindowPos(hwnd,None,0,0,0,0,0x37)
-        def dispose(e):
-            if e.widget is window and u.IsWindow(hwnd) and u.GetWindowLongPtrW(hwnd,-4)==C.cast(callback,C.c_void_p).value:u.SetWindowLongPtrW(hwnd,-4,old)
-        window.bind('<Destroy>',dispose,add='+')
+    # Never subclass Tk's HWND with a Python WndProc. The wrapper can be
+    # destroyed/recreated inside a native message; a collected callback there
+    # is a process crash, not a recoverable Tk exception.
+    if not getattr(window,'_frame_resize_bound',False):
+        def resize(event):
+            if window.attributes('-fullscreen') or window.state()=='zoomed':return
+            x=event.x_root-window.winfo_rootx();y=event.y_root-window.winfo_rooty()
+            width=window.winfo_width();height=window.winfo_height()
+            left=x<5;right=x>=width-5;top=y<5;bottom=y>=height-5
+            edge=(4 if left else 5 if right else 3) if top else (7 if left else 8 if right else 6) if bottom else 1 if left else 2 if right else None
+            if edge is None:return
+            if not any(map(int,window.resizable())):return
+            handle=u.GetParent(window.winfo_id()) or window.winfo_id()
+            u.SendMessageW.argtypes=[W.HWND,W.UINT,W.WPARAM,W.LPARAM]
+            u.SendMessageW.restype=C.c_ssize_t
+            u.ReleaseCapture();u.SendMessageW(handle,0x112,0xF000+edge,0)
+            return 'break'
+        window.bind('<ButtonPress-1>',resize,add='+');window._frame_resize_bound=True
     u.SetWindowRgn.argtypes=[W.HWND,W.HRGN,W.BOOL]
     r=W.RECT();u.GetWindowRect(hwnd,C.byref(r))
     u.GetClientRect.argtypes=[W.HWND,C.POINTER(W.RECT)]
@@ -95,3 +78,21 @@ def transition(window,action):
     """Coalesce native window geometry changes into one repaint."""
     try:action()
     finally:window.after_idle(lambda:repaint(window) if window.winfo_exists() else None)
+
+def restore_client_size(window,geometry):
+    """Tk caches the standard caption's border; restore actual client pixels."""
+    if not window.winfo_exists() or window.attributes('-fullscreen'):return
+    import re
+    match=re.match(r'(\d+)x(\d+)',geometry)
+    if not match:return
+    width,height=map(int,match.groups())
+    u=C.windll.user32
+    u.GetParent.argtypes=[W.HWND];u.GetParent.restype=W.HWND
+    u.GetWindowRect.argtypes=[W.HWND,C.POINTER(W.RECT)]
+    u.GetClientRect.argtypes=[W.HWND,C.POINTER(W.RECT)]
+    u.SetWindowPos.argtypes=[W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT]
+    handle=u.GetParent(window.winfo_id()) or window.winfo_id();outer=W.RECT();client=W.RECT()
+    u.GetWindowRect(handle,C.byref(outer));u.GetClientRect(handle,C.byref(client))
+    if (width,height)!=(client.right,client.bottom):
+        u.SetWindowPos(handle,None,0,0,outer.right-outer.left+width-client.right,
+                       outer.bottom-outer.top+height-client.bottom,0x16)

@@ -26,6 +26,7 @@ python tools/check_project.py
 | Асинхронный PDF/автопрокрутка/fullscreen | `verify_async_pdf.py` |
 | PDF-масштаб без ожидания точных плиток | `verify_pdf_zoom.py` — синтетический А0 по умолчанию; BUREAU_ID_ZOOM_SAMPLE — один локальный образец (читается в временную копию), BUREAU_ID_ZOOM_BASELINE — необязательный старый pdf_page_preview.py для сравнения. История Git для обычной регрессии не нужна |
 | Символы, повороты, OCR, вставка | `verify_pdf_selection.py` (Windows OCR, временные синтетические документы) |
+| Запуск/рамка/изолированный анализ | `verify_window_lifecycle.py`, `verify_passport_process.py`, `verify_project_scan_lifecycle.py` — только синтетические временные проекты; настоящий PDF/JPEG OCR и авария дочернего процесса |
 | Сканер/разделение | `verify_scan_checklist.py`, `verify_scan_split.py` |
 | Нижняя панель ОС / подсказки | `verify_taskbar_hints.py` (виртуальные координаты; без движения мыши пользователя) |
 | Ленты/вспомогательные окна | `verify_utility_controls.py` |
@@ -48,3 +49,5 @@ python tools/check_project.py
 - EXE пока не собирается. Для упаковки нужны режим отдельного PDF worker, ресурсы TkDND, PowerShell-скрипты, зависимости и проверка условий распространения.
 
 Результат проверки фиксировать в `docs/CHANGELOG.md`; не выдавать успех синтаксиса за визуальную проверку произвольных документов.
+
+Clipboard не создаёт owning StringVar с именем чужой переменной. Форма снимает только trace из собственного списка команд; чужие trace снимает их владелец. Повторное удаление Tcl-команды может затронуть уже переиспользованное имя команды.

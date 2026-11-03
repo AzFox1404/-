@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory() as td:
    u=C.windll.user32;u.GetClientRect.argtypes=[W.HWND,C.POINTER(W.RECT)]
    hwnd=u.GetParent(window.winfo_id()) or window.winfo_id();outer=W.RECT();client=W.RECT()
    u.GetWindowRect(hwnd,C.byref(outer));u.GetClientRect(hwnd,C.byref(client))
-   assert window._client_proc[2]==hwnd,'frame handler must follow a recreated Tk wrapper'
+   assert not getattr(window,'_client_proc',None),'native message dispatch must not enter a Python callback'
    assert window._client_bounds[2:]==(client.right,client.bottom)
    g=C.windll.gdi32;g.CreateRectRgn.argtypes=[C.c_int]*4;g.CreateRectRgn.restype=W.HRGN
    u.GetWindowRgn.argtypes=[W.HWND,W.HRGN];g.GetRgnBox.argtypes=[W.HRGN,C.POINTER(W.RECT)]

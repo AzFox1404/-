@@ -61,7 +61,7 @@ with tempfile.TemporaryDirectory() as td:
  assert list((app.catalog_dir/'Кэш выделения текста').glob('*.json'))
  # Actual working-environment PDF preview methods with a generated PDF, no Office dependency.
  other=tk.Toplevel(root);other.geometry('1000x800');host=tk.Frame(other);host.pack(fill='both',expand=True)
- worker=SimpleNamespace(body={2:host},zoom=70,latest={'act':native.read_bytes()},current='act',catalog_dir=app.catalog_dir,icon_button=app.icon_button)
+ worker=SimpleNamespace(body={2:host},zoom=70,latest={'act':native.read_bytes()},current='act',models={},catalog_dir=app.catalog_dir,icon_button=app.icon_button)
  worker.draw=lambda:Workspace.draw(worker);worker.rescale=lambda z:Workspace.rescale(worker,z)
  Workspace.preview(worker);pump(root);choose(worker,'14.01.2024')
  choose(worker,'869');studio.Studio.command(worker,2,'copy');assert root.clipboard_get()=='869'

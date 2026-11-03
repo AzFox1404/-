@@ -11,7 +11,7 @@
 | Панель задач при fullscreen | `app/taskbar_reveal.py` | нижняя зона 24px; маска окна, без изменения настроек Windows |
 | Темы, иконки, подсказки, ленты | `app/ui_tools.py`, `app/command_icons.py`, `app/hints.py` | `app/app_dialogs.py`, `app/windows_integration.py` |
 | Заголовки окон в теме приложения | `app/window_caption.py` | native resize/move и taskbar сохранены; `windows_integration.theme_caption` |
-| Рамки/скругления и восстановление отрисовки | `app/ui_surface.py` | видимая client-region, привязка к пересозданному HWND; repaint полей без повторного цикла |
+| Рамки/скругления и восстановление отрисовки | `app/ui_surface.py` | видимая client-region без Python WndProc; restore_client_size после fullscreen; repaint полей без повторного цикла |
 | Тонкие полосы прокрутки | `app/smooth_scrollbar.py` | стандартные set/moveto/scroll; скруглённый thumb и hover 120 мс |
 | Панели: отделить, скрыть, вернуть | `app/workspace_preview.py` (`pane_header`, `collapse_panel`, `restore_panel`) | `studio.build`, `app/save_decisions.py` |
 | Перетягивание стеклянных панелей | `app/glass_resize.py` | `tests/verify_home_drag_release.py`, `tests/verify_glass_resize.py` |
@@ -30,7 +30,7 @@
 | Линейки PDF и номера Excel | `app/pdf_guides.py` | `app/PreviewGuides.ps1` — геометрия Office; `app/pdf_guide_scale.py` — измерение печатного масштаба; только экран |
 | Выделение/OCR PDF-текста | `app/pdf_text_selection.py` | `app/PassportOCR.ps1` |
 | Ctrl+C/V/X/Z/Y, выделение, колесо | `app/clipboard_keys.py`, `app/drag_selection.py`, `app/interactions.py`, `app/auto_scroll.py` | `app/keyboard_navigation.py` |
-| Паспорта и сертификаты | `app/scanner_ui.py`, `app/passports.py` | `app/quality_library.py`, `app/PassportOCR.ps1` |
+| Паспорта и сертификаты | `app/scanner_ui.py`, `app/passports.py` | `app/passport_process.py` → отдельный `app/passport_worker.py` → `app/PassportOCR.ps1`; `app/quality_library.py` |
 | Комплект для печати | `app/package_build.py`, `app/package_checks.py` | `app/MakeRegistry.ps1`, `Session` |
 | Сохранить / не сохранять | `app/save_decisions.py`, `app/recovery_state.py` | `.recovery/baseline`, `working`, `checkpoints`, `.backups` внутри проекта |
 | Drag-and-drop файлов | `app/win_drop.py` | `vendor/tkdnd-win-x64/` |

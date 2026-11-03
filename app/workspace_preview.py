@@ -237,7 +237,9 @@ class Workspace:
         for variable in old.values():
             if isinstance(variable,tk.Variable):
                 try:
-                    for mode,callback in variable.trace_info():variable.trace_remove(mode,callback)
+                    owned=set(variable._tclCommands or ())
+                    for mode,callback in variable.trace_info():
+                        if callback in owned:variable.trace_remove(mode,callback)
                 except tk.TclError:pass
     def restore_panel(self,n):
         if n in self.windows:
@@ -282,7 +284,11 @@ class Workspace:
         def apply():
             if active:
                 w.taskbar_reveal['reset']();w.attributes('-fullscreen',False)
-                w.state('normal');w.geometry(w._before_panel_full)
+                w.state('normal')
+                if getattr(w,'app_caption',None):w.app_caption.reconcile()
+                w.geometry(w._before_panel_full)
+                from ui_surface import restore_client_size
+                w.after_idle(lambda:restore_client_size(w,w._before_panel_full))
                 w._bottom_safe.pack_forget()
             else:
                 if w is not self.root and getattr(self.root,'taskbar_reveal',None):self.root.taskbar_reveal['reset']()

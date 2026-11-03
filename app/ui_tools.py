@@ -308,7 +308,12 @@ class Interface:
                 self.root.attributes('-fullscreen',False)
                 if hasattr(self,'_before_full'):
                     geometry,state=self._before_full
-                    self.root.state('normal');self.root.geometry(geometry)
+                    self.root.state('normal')
+                    if getattr(self.root,'app_caption',None):self.root.app_caption.reconcile()
+                    self.root.geometry(geometry)
+                    if state!='zoomed':
+                        from ui_surface import restore_client_size
+                        self.root.after_idle(lambda:restore_client_size(self.root,geometry))
                     if state=='zoomed':self.root.state('zoomed')
         transition(self.root,apply)
         for w in self.full_buttons:

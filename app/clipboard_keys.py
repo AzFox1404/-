@@ -14,14 +14,20 @@ def install(widget):
         widget.bindtags((tag,)+tuple(t for t in widget.bindtags() if t!=tag));return
     widget.clipboard_keys_installed=True
     name=str(widget.cget('textvariable'))
-    variable=tk.StringVar(master=widget,name=name) if name else tk.StringVar(master=widget,value=widget.get())
-    if not name:widget.configure(textvariable=variable)
-    widget._undo_var=variable;past=[];future=[];current=[variable.get()];replay=[False]
+    if not name:
+        widget._undo_var=tk.StringVar(master=widget,value=widget.get())
+        name=str(widget._undo_var);widget.configure(textvariable=name)
+    # Borrow the Tcl variable, never construct another owning StringVar with
+    # the same name. Its destructor would unset the form's original variable.
+    def read():return str(widget.tk.globalgetvar(name))
+    def write(value):widget.tk.globalsetvar(name,value)
+    past=[];future=[];current=[read()];replay=[False]
     def track(*args):
-        new=variable.get()
+        new=read()
         if not replay[0] and new!=current[0]:past.append(current[0]);del past[:-128];future.clear()
         current[0]=new
-    trace=variable.trace_add('write',track)
+    trace=widget.register(track)
+    widget.tk.call('trace','add','variable',name,'write',trace)
     tag='ClipboardKeys'+str(widget)
     widget.bindtags((tag,)+widget.bindtags())
     def key(event):
@@ -32,8 +38,8 @@ def install(widget):
             if handler:handler(op);return 'break'
             src,dst=(past,future) if op=='undo' else (future,past)
             if src:
-                dst.append(variable.get());replay[0]=True
-                try:variable.set(src.pop());widget.icursor('end')
+                dst.append(read());replay[0]=True
+                try:write(src.pop());widget.icursor('end')
                 finally:replay[0]=False
             return 'break'
         if op not in ('copy','paste','cut','all'):return
@@ -50,7 +56,7 @@ def install(widget):
             value=widget.get()
             a=int(widget.index('sel.first')) if widget.selection_present() else int(widget.index('insert'))
             b=int(widget.index('sel.last')) if widget.selection_present() else a
-            variable.set(value[:a]+text+value[b:]);widget.icursor(a+len(text));widget.xview('insert')
+            write(value[:a]+text+value[b:]);widget.icursor(a+len(text));widget.xview('insert')
         return 'break'
     widget.bind_class(tag,'<KeyPress>',key)
     from types import SimpleNamespace
@@ -60,5 +66,6 @@ def install(widget):
         if event.widget is widget:
             widget.unbind_class(tag,'<KeyPress>')
             for event in virtuals:widget.unbind_class(tag,event)
-            variable.trace_remove('write',trace)
+            widget.tk.call('trace','remove','variable',name,'write',trace)
+            widget.deletecommand(trace)
     widget.bind('<Destroy>',cleanup,add='+')

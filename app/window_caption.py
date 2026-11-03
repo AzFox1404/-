@@ -43,9 +43,15 @@ def install(window,colors,dark):
                 if current is not None and current.winfo_exists():current.label.configure(text=original())
                 return result
             window.title=title;window._caption_title_hook=True
+        bar.pending=None;bar.syncing=False
         def sync(event=None):
             if event is not None and event.widget is not window:return
             if not window.winfo_exists() or not bar.winfo_exists():return
+            if bar.syncing:return
+            bar.syncing=True
+            try:apply_frame()
+            finally:bar.syncing=False
+        def apply_frame():
             full=bool(window.attributes('-fullscreen'))
             if full:bar.pack_forget()
             elif not bar.winfo_manager():
@@ -57,13 +63,27 @@ def install(window,colors,dark):
                 u.SetWindowPos(hwnd(),None,0,0,0,0,0x37)
             from ui_surface import rounded_frame
             rounded_frame(window)
-            bar.label.configure(text=window.title())
-        mapped=window.bind('<Map>',lambda e=None:window.after_idle(sync) if e is None or e.widget is window else None,add='+')
-        resized=window.bind('<Configure>',sync,add='+');bar.sync=sync
+            if bar.label.cget('text')!=window.title():bar.label.configure(text=window.title())
+        def schedule(event=None):
+            if event is not None and event.widget is not window:return
+            if bar.pending is None:
+                def flush():
+                    bar.pending=None;sync()
+                # Tk may recreate its wrapper and restore native styles while
+                # applying transient/state/Map. Reconcile after that operation.
+                bar.pending=window.after_idle(flush)
+        mapped=window.bind('<Map>',schedule,add='+')
+        resized=window.bind('<Configure>',schedule,add='+');bar.sync=schedule;bar.reconcile=sync
+        def dispose(e):
+            if e.widget is window and bar.pending is not None:
+                window.after_cancel(bar.pending);bar.pending=None
+        window.bind('<Destroy>',dispose,add='+')
         window._caption_bindings=[('<Map>',mapped),('<Configure>',resized)]
     bar.configure(bg=colors['accent']);bar.label.configure(bg=colors['accent'],fg=colors['text'])
     from command_icons import command_icon
     bar.feather=command_icon(window,'feather',colors['text']);bar.logo.configure(image=bar.feather,bg=colors['accent'])
-    window.iconphoto(isinstance(window,tk.Tk),bar.feather)
+    # Reapplying iconphoto during every paint can recreate the Windows wrapper.
+    if not getattr(window,'_caption_icon_set',False):
+        window.iconphoto(isinstance(window,tk.Tk),bar.feather);window._caption_icon_set=True
     window.caption_theme=dict(dark=dark,dark_mode=True,native_colors=False,custom=True)
     bar.sync()

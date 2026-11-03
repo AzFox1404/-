@@ -140,7 +140,8 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         landing_split.bind('<B1-Motion>',lambda e:constrain(),add='+')
         landing_split.bind('<ButtonRelease-1>',lambda e:constrain(),add='+')
         self.root.after_idle(self.limit_home_layout)
-        self.paint(self.landing)
+        # Startup must theme the toplevel too, before any theme toggle occurs.
+        self.paint(self.root)
     def import_item(self,kind,path=None,_approved=False):
         if not _approved and self.project and hasattr(self,"models"):
             self.decide_project(lambda:self.import_item(kind,path,True));return
