@@ -77,6 +77,31 @@ try{
  while($line=[Console]::ReadLine()){
   try{
    $req=$line|ConvertFrom-Json
+   if($req.batch){
+    $b=$req.batch;$cleanReady=$false;$deferRegisterSave=$true
+    try{
+     if($b.section){
+      if(!$excel){throw 'Разделы доступны только в распознанном общем реестре Excel.'}
+      $selected=EditRegisterSection ([int]$b.section) ([bool]$b.delete) ([string]$b.title)
+     }else{
+      $targets=@($b.rows | Where-Object {$null -ne $_});if(!$targets.Count){$targets=@([int]$b.row)}
+      $targets=@($targets | ForEach-Object {[int]$_} | Sort-Object -Unique -Descending)
+      # Validate the complete request before changing any rows.
+      $valid=if($excel){@(GetRegisterRows $sheet (GetRegisterLayout $sheet))}else{@($special.Keys | Where-Object {$_ -match '^row\d+_'} | ForEach-Object {[int]($_.Split('_')[0].Substring(3))})}
+      foreach($target in $targets){if($target -notin $valid){throw 'Выбрана устаревшая строка. Повторите выбор.'}}
+      $selected=[int]$b.row
+      if($b.delete){foreach($target in $targets){if($excel){RemoveRegisterPosition $target}else{AddWordRegisterPosition $target $true}}}
+      else{
+       $count=if($b.count){[int]$b.count}else{1};if($count -lt 1 -or $count -gt 500){throw 'Допустимо от 1 до 500 строк.'}
+       $target=[int]$targets[-1]
+       for($i=0;$i -lt $count;$i++){$selected=if($excel){AddRegisterPosition $target}else{AddWordRegisterPosition $target};$target=$selected}
+      }
+     }
+    }finally{$deferRegisterSave=$false}
+    if($excel){SetupRegisterPrint $sheet;$app.CalculateFull()}else{UpdateWordTotals}
+    $doc.Save()
+    Send @{ok=$true;row=$selected;fields=$fields;spec=$special};continue
+   }
    if($req.delete){
     $cleanReady=$false
     if($excel){RemoveRegisterPosition ([int]$req.delete);Send @{ok=$true}}else{AddWordRegisterPosition ([int]$req.delete) $true;Send @{ok=$true;fields=$fields;spec=$special}};continue

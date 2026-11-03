@@ -78,7 +78,7 @@ function AddWordRegisterPosition([int]$row,[bool]$delete=$false){
   }
  }
  foreach($formula in $table.Range.Fields){if(([string]$formula.Code.Text) -match '^\s*=\s*(SUM|COUNT)\s*\('){[void]$formula.Update()}}
- $doc.Save()
+ if(!$deferRegisterSave){$doc.Save()}
  if(!$delete){return $new}
 }
 

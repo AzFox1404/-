@@ -70,9 +70,14 @@ def command_icon(master,name,color):
         line((4,5),(16,5));line((7,3),(13,3));line((5,6),(6,17),(14,17),(15,6));line((8,8),(8,14));line((12,8),(12,14))
     elif name=='exception':
         box(3,2,17,18);line((6,5),(14,5));line((6,9),(11,9));line((13,10),(13,16));line((10,13),(16,13))
+    elif name in ('addsection','deletesection'):
+        box(2,2,12,18);line((4,6),(10,6));line((4,10),(10,10));line((4,14),(10,14))
+        line((14,12),(19,12))
+        if name=='addsection':line((16.5,9),(16.5,15))
     elif name=='addrow':
-        for y in (3,8,13,18):line((2,y),(12,y))
-        line((2,3),(2,18));line((12,3),(12,18));line((16,9),(16,17));line((13,13),(19,13))
+        line((5,2),(14,2),(14,7));box(2,5,11,18)
+        for y in (9,13):line((2,y),(11,y))
+        line((16,10),(16,18));line((12,14),(20,14))
     elif name=='catalog':
         box(2,3,8,17);box(10,3,16,17);line((5,6),(5,13));line((13,6),(13,13))
     elif name=='save':
@@ -80,8 +85,9 @@ def command_icon(master,name,color):
     elif name=='passports':
         line((2,7),(2,4),(7,4),(9,6),(18,6),(18,17),(2,17),(2,7));line((8,12),(11,15),(16,9))
     elif name=='deleterow':
-        for y in (3,8,13,18):line((2,y),(12,y))
-        line((2,3),(2,18));line((12,3),(12,18));line((14,11),(19,11))
+        line((5,2),(14,2),(14,7));box(2,5,11,18)
+        for y in (9,13):line((2,y),(11,y))
+        line((12,14),(20,14))
     elif name=='sun':
         d.ellipse((6*scale,6*scale,14*scale,14*scale),outline=color,width=5)
         for a,b,c,e in [(10,1,10,4),(10,16,10,19),(1,10,4,10),(16,10,19,10),(3,3,5,5),(15,15,17,17),(3,17,5,15),(15,5,17,3)]:line((a,b),(c,e))

@@ -109,7 +109,7 @@ function AddRegisterPosition([int]$row){
   if(!$cell.HasFormula){[void]$cell.ClearContents()}
  }
  RepairRegisterNumbers $sheet $new $pageMode
- SetupRegisterPrint $sheet;$app.CalculateFull();$doc.Save()
+ if(!$deferRegisterSave){SetupRegisterPrint $sheet;$app.CalculateFull();$doc.Save()}
  return $new
 }
 function RemoveRegisterPosition([int]$row){
@@ -119,6 +119,37 @@ function RemoveRegisterPosition([int]$row){
  if($rows.Count -le 1){for($c=2;$c -le $layout.lastcol;$c++){$cell=$sheet.Cells.Item($row,$c);if(!$cell.HasFormula){[void]$cell.ClearContents()}}}
  else{[void]$sheet.Rows.Item($row).Delete()}
  RepairRegisterNumbers $sheet 0 $pageMode
- SetupRegisterPrint $sheet;$app.CalculateFull();$doc.Save()
+ if(!$deferRegisterSave){SetupRegisterPrint $sheet;$app.CalculateFull();$doc.Save()}
+}
+
+function EditRegisterSection([int]$start,[bool]$delete,[string]$title){
+ $layout=GetRegisterLayout $sheet
+ if(!$layout.general){throw 'Разделы поддерживаются только в общем реестре.'}
+ $headers=@()
+ for($r=$layout.first;$r -le $layout.bottom;$r++){
+  $cell=$sheet.Cells.Item($r,1);$text=([string]$cell.Value2).Trim()
+  if($cell.MergeArea.Columns.Count -gt 1 -and $text -and $text -notmatch '^(АОСР|АООК|Акты|Исполнительные схемы|Паспорта|Сертификаты|Приложения)'){$headers+=$r}
+ }
+ if($start -notin $headers){throw 'Не подтверждена граница раздела.'}
+ $next=@($headers | Where-Object {$_ -gt $start} | Select-Object -First 1)
+ $end=if($next.Count){[int]$next[0]-1}else{$layout.bottom}
+ # Leave the blank separator preceding the signatures outside the section.
+ while($end -gt $start -and $sheet.Application.WorksheetFunction.CountA($sheet.Range("A${end}:F${end}")) -eq 0){$end--}
+ $rows=@(GetRegisterRows $sheet $layout);$mode=GetRegisterPageMode $sheet $rows
+ if($delete){
+  if($headers.Count -lt 2){throw 'Нельзя удалить последний раздел.'}
+  [void]$sheet.Rows.Item("${start}:${end}").Delete();$selected=$start
+ }else{
+  if(!$title.Trim()){throw 'Введите название раздела.'}
+  if($title -match '^(АОСР|АООК|Акты|Исполнительные схемы|Паспорта|Сертификаты|Приложения|Передал|Принял)'){throw 'Это название обозначает группу документов или подпись. Введите название раздела.'}
+  $at=$end+1;$length=$end-$start+1;$last=$at+$length-1
+  [void]$sheet.Rows.Item("${at}:${last}").Insert()
+  [void]$sheet.Rows.Item("${start}:${end}").Copy($sheet.Rows.Item("${at}:${last}"))
+  $sheet.Cells.Item($at,1).Value2=$title
+  foreach($r in $rows){if($r -gt $start -and $r -le $end){$dest=$at+$r-$start;for($c=2;$c -le 6;$c++){[void]$sheet.Cells.Item($dest,$c).ClearContents()}}}
+  $selected=$at+1
+ }
+ RepairRegisterNumbers $sheet 0 $mode;SetupRegisterPrint $sheet
+ return $selected
 }
 

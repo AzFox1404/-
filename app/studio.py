@@ -396,9 +396,14 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             self.icon_button(line,'exception','Сохранить введённый вариант как исключение',self.save_exception)
             if self.current in getattr(self,'row_actions',{}):
                 insert,catalog,remove=self.row_actions[self.current]
-                self.icon_button(line,'addrow','Добавить позицию после выбранной строки',insert)
-                self.icon_button(line,'deleterow','Удалить выбранную позицию; последняя строка очищается',remove)
-                self.icon_button(line,'catalog','Заполнить выбранную строку из каталога документов',catalog)
+                actions=tk.Frame(host,bg='#f6eee8');actions.panel_toolbar=True
+                actions.pack(fill='x',**({'before':before} if before else {}))
+                self.icon_button(actions,'addrow','Добавить одну или несколько позиций · выбрать количество',insert)
+                self.icon_button(actions,'deleterow','Удалить выбранные позиции · Ctrl/Shift для нескольких строк',remove)
+                self.icon_button(actions,'catalog','Заполнить текущую строку из каталога документов',catalog)
+                if any(k.startswith('part') for k in self.models.get(self.current,{})):
+                    self.icon_button(actions,'addsection','Добавить раздел по образцу текущего',lambda:self.register_section(False))
+                    self.icon_button(actions,'deletesection','Удалить текущий раздел со всеми его позициями',lambda:self.register_section(True))
     def command(self,n,cmd):
         if n is None:
             n=getattr(self,'active_panel',1)
@@ -452,6 +457,7 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
     def form(self):
         self.append_popup={}
         if self.current and getattr(self.current,'row_operation_busy',False):
+            getattr(self,'row_actions',{}).pop(self.current,None)
             self.views={};self.targets.pop(1,None)
             ttk.Label(self.body[1],text='Обновляем строки реестра…',padding=16).pack(anchor='w')
             return
@@ -535,21 +541,53 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         def select(e):
             row=int(selector.get());self.row_choice[session]=row;self.build(1);self.request_review(session,row=row)
         selector.bind('<<ComboboxSelected>>',select)
-        def insert():self.queue_register_operation(session,False)
+        ttk.Label(parent,text='Позиции для добавления / удаления').pack(anchor='w',padx=10)
+        selection=tk.Listbox(parent,selectmode='extended',exportselection=False,height=4)
+        selection.pack(fill='x',padx=10,pady=3)
+        for r in rows:
+            text=next((str(v) for k,v in vals.items() if k.startswith(f'row{r}_') and str(v).strip()),'Пустая позиция')
+            selection.insert('end',f'{r} · {text[:70]}')
+        selection.selection_set(rows.index(active));selection.see(rows.index(active))
+        ttk.Label(parent,text='Выбор нескольких: Ctrl / Shift',wraplength=180).pack(anchor='w',padx=10)
+        def chosen():return [rows[i] for i in selection.curselection()] or [active]
+        def insert():
+            from tkinter import simpledialog
+            count=simpledialog.askinteger('Добавление позиций','Количество новых строк:',initialvalue=len(chosen()),minvalue=1,maxvalue=500,parent=self.root)
+            if count:self.queue_register_operation(session,False,dict(rows=[chosen()[0]],count=count))
         def remove():
-            if messagebox.askyesno('Удаление позиции','Удалить выбранную позицию? Последняя строка будет очищена, чтобы сохранить форму.'):
-                self.queue_register_operation(session,True)
+            selected=chosen()
+            if messagebox.askyesno('Удаление позиций',f'Удалить выбранные позиции ({len(selected)})? Последняя строка будет очищена, чтобы сохранить форму.',parent=self.root):
+                self.queue_register_operation(session,True,dict(rows=selected))
         self.row_actions[session]=(insert,lambda:self.catalog_into_row(session,active),remove)
         parts=[k for k in vals if k.startswith('part') and k[4:].isdigit() and int(k[4:])<=active]
         nearest=max(parts,key=lambda k:int(k[4:])) if parts else None
         groups=[k for k in vals if k.startswith('group') and k[5:].isdigit() and int(k[5:])<=active and (nearest is None or int(k[5:])>=int(nearest[4:]))]
         nearest_group=max(groups,key=lambda k:int(k[5:])) if groups else None
         return {k:v for k,v in vals.items() if (not k.startswith('row') or k.startswith(f'row{active}_')) and (not k.startswith('part') or k==nearest) and (not k.startswith('group') or k==nearest_group)}
-    def queue_register_operation(self,session,delete):
+    def register_section(self,delete):
+        from tkinter import simpledialog
+        s=self.current;vals=self.models.get(s,{})
+        row=self.row_choice.get(s,0)
+        parts=sorted(int(k[4:]) for k in vals if k.startswith('part') and k[4:].isdigit())
+        start=max((r for r in parts if r<=row),default=None)
+        if start is None:return
+        end=next((r for r in parts if r>start),10**9)
+        count=len({int(k.split('_')[0][3:]) for k in vals if k.startswith('row') and start<int(k.split('_')[0][3:])<end})
+        name=vals['part'+str(start)]
+        if delete:
+            if len(parts)<2:
+                messagebox.showinfo('Раздел','Последний раздел нужно сохранить. Можно удалить его позиции.',parent=self.root);return
+            if not messagebox.askyesno('Удаление раздела',f'Удалить раздел «{name}» и его позиции ({count})?',parent=self.root):return
+            title=''
+        else:
+            title=simpledialog.askstring('Новый раздел','Название раздела:',parent=self.root)
+            if not title or not title.strip():return
+        self.queue_register_operation(s,delete,dict(section=start,title=title))
+    def queue_register_operation(self,session,delete,options=None):
         if getattr(self,'stopping',False):return
         queue=getattr(session,'row_operations',None)
         if queue is None:queue=[];session.row_operations=queue
-        queue.append(delete)
+        queue.append(dict(delete=delete,**options) if options else delete)
         self.start_register_operation(session)
     def start_register_operation(self,session):
         if getattr(session,'row_operation_busy',False) or not getattr(session,'row_operations',[]):return
@@ -561,9 +599,11 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         row=self.row_choice.get(session,rows[0]);row=min(rows,key=lambda n:abs(n-row))
         if session in self.pending:
             self.root.after_cancel(self.pending[session]);self.submit(session)
-        delete=session.row_operations.pop(0);session.row_operation_busy=True
+        operation=session.row_operations.pop(0)
+        options=operation if isinstance(operation,dict) else dict(delete=operation)
+        delete=options['delete'];session.row_operation_busy=True
         self.revisions[session]+=1;self.mark_changed(session)
-        session.tasks.put(dict(row=row,revision=self.revisions[session],delete=delete))
+        session.tasks.put(dict(row=row,revision=self.revisions[session],**options))
         self.status.set('Удаляем позицию и пересчитываем реестр…' if delete else 'Добавляем позицию и пересчитываем реестр…')
         if session is self.current:self.build(1)
     def title_from_act(self):

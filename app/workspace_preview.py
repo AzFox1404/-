@@ -102,7 +102,7 @@ class Session:
                     if job is None: break
                     started=time.perf_counter()
                     if isinstance(job,dict):
-                        process.stdin.write(json.dumps({'delete' if job.get('delete') else 'insert':job['row']})+'\n');process.stdin.flush();response=receive();inserted_row=response.get('row',job['row']+1)
+                        process.stdin.write(json.dumps(dict(batch=job))+'\n');process.stdin.flush();response=receive();inserted_row=response.get('row',job['row']+1)
                         if self.copy.suffix.lower() in ('.doc','.docx'):
                             spec=response['spec'];fields=response['fields']
                         else:
