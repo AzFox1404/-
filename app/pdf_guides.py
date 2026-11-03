@@ -42,6 +42,7 @@ class Guides:
                 if y+h<viewport or y>bottom or v.rotations.get(str(page),0):continue
                 pw=v._sizes[page][0];z=g.get('zoom')
                 factor=float(z)/100 if isinstance(z,(int,float)) and not isinstance(z,bool) else min(1,(pw-g['left']-g['right'])/max(1,g['width']))
+                factor=g.get('print_scale',factor)
                 if page==n:
                     x=g['left']+((pw-g['left']-g['right']-g['width']*factor)/2 if g.get('center') else 0)
                     for c in g['cols']:
@@ -55,7 +56,11 @@ class Guides:
                 for r in titles:positions.append((r,offset));offset+=r['size']
                 positions.extend((r,title_height+r['start']-origin) for r in rows if first<=int(r['name'])<end)
                 for r,offset in positions:
-                    number=int(r['name']);a=y-viewport+(g['top']+offset*factor)*scale;b=a+r['size']*factor*scale
+                    number=int(r['name'])
+                    position=g['top']+offset*factor
+                    measured=g.get('page_offsets',{}).get(str(page))
+                    if measured is not None and number>=first:position=measured+r['start']*factor
+                    a=y-viewport+position*scale;b=a+r['size']*factor*scale
                     if b<0 or a>l.winfo_height() or b-a<2:continue
                     l.create_rectangle(0,a,width-1,b,fill='#edcbb2' if number==active else '#eee7df',outline='#b6ada5')
                     if b-a>=10:l.create_text(width/2,(a+b)/2,text=r['name'],font=self.font)

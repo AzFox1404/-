@@ -75,13 +75,13 @@ def install(root):
             if inside:
                 if not state['layered'] or u.GetWindowLongPtrW(bar,-20)&8:
                     u.SetWindowPos(bar,C.c_void_p(-2),0,0,0,0,0x13)
-                    u.SetWindowPos(hwnd,None,0,0,0,0,0x13)
                     u.SetWindowPos(bar,hwnd,0,0,0,0,0x13);state['layered']=True
                 animate(max(0,rect.bottom-bar_rect.top))
             else:
                 if state['target'] or u.GetWindowLongPtrW(bar,-20)&8:
                     u.SetWindowPos(bar,C.c_void_p(-2),0,0,0,0,0x13)
-                    u.SetWindowPos(hwnd,None,0,0,0,0,0x13);state['layered']=True
+                    u.SetWindowPos(bar,hwnd,0,0,0,0,0x13)
+                    state['layered']=True
                 animate(0)
         else:reset();return
         if state['bar']:state['timer']=root.after(90,poll)
@@ -109,6 +109,6 @@ def install(root):
             class Position:pass
             pos=Position();pos.y_root=root.winfo_rooty()+root.winfo_height()
             motion(pos)
-    root.bind('<FocusIn>',activated,add='+')
+    root.bind_all('<FocusIn>',activated,add='+')
     root.bind('<Unmap>',reset,add='+');root.bind('<Destroy>',reset,add='+')
     state['reset']=reset

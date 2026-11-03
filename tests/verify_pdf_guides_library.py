@@ -17,6 +17,7 @@ def wait(root,fn):
 with tempfile.TemporaryDirectory() as td:
  p=Path(td);file=p/'Registry.xlsx';w=Workbook();ws=w.active
  ws['B8']='Наименование документа';ws['C8']='Номер документа'
+ ws.column_dimensions['B'].width=70;ws.column_dimensions['C'].width=25
  for row in range(9,101):ws.cell(row,1,row-8);ws.cell(row,2,'ROW'+str(row));ws.cell(row,5,1)
  ws['B101']='Всего страниц:';ws.print_area='A1:E101';ws.print_title_rows='1:8';w.save(file);w.close()
  s=Session(file,queue.Queue(),prepared=True)
@@ -26,6 +27,7 @@ with tempfile.TemporaryDirectory() as td:
    if kind=='error':raise AssertionError(data)
    if kind=='pdf':pdf=data[1];break
   assert s.guides['kind']=='excel' and not s.guides.get('unsupported'),s.guides
+  assert s.guides.get('print_scale'),s.guides.get('anchors')
   assert any(r['name']=='9' for r in s.guides['rows'])
   studio.STORE=p/'store';studio.PROJECTS=studio.STORE/'Проекты';studio.LIB=studio.STORE/'Библиотека/Шаблоны'
   root=tk.Tk();app=studio.Studio(root);errors=[];root.report_callback_exception=lambda *e:errors.append(str(e[1]))
@@ -36,6 +38,13 @@ with tempfile.TemporaryDirectory() as td:
   hit=next(hit for hit in view.rulers.hits if hit[2]==row)
   center=view.pages[0][0]+(word[1]+word[3])/2*view.zoom/75-view.canvas.canvasy(0)
   assert hit[0]-4<=center<=hit[1]+4,(hit,center)
+  for number in (30,60,90):
+   page_index,box=next((i,word) for i,page in enumerate(doc) for word in page.get_text('words') if word[4]=='ROW'+str(number))
+   position=view.pages[page_index][0]+(box[1]+box[3])/2*view.zoom/75
+   view.canvas.yview_moveto(max(0,position-100)/view.height);view.rulers.draw()
+   target=next(hit for hit in view.rulers.hits if hit[2]==number)
+   local=position-view.canvas.canvasy(0)
+   assert target[0]-4<=local<=target[1]+4,(number,target,local,s.guides.get('print_scale'),s.guides.get('page_offsets'),s.guides['anchors'][:3])
   assert len(view.pages)>1 and s.guides['breaks']
   assert view.ruler_top.winfo_rootx()==view.canvas.winfo_rootx()
   assert view.ruler_left.winfo_rooty()==view.canvas.winfo_rooty()

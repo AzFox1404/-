@@ -132,6 +132,8 @@ class Session:
                 response=receive()
                 if response.get('cleanReady'):
                     self.guides=response.get('guides',{})
+                    from pdf_guide_scale import calibrate
+                    self.guides=calibrate(self.guides,pdf.read_bytes())
                     data=pdf.read_bytes();self.clean_hash=digest(self.copy)
                     self.formula_errors=response.get('formulaErrors',[]);self.validated_revision=revision
                     self.verified_values=(revision,dict(fields))

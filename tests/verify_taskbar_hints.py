@@ -24,11 +24,16 @@ with tempfile.TemporaryDirectory() as td:
     task=W.RECT();assert u.GetWindowRect(bar,C.byref(task))
     before=(root.winfo_width(),root.winfo_height())
     original_cursor=u.GetCursorPos;original_foreground=u.GetForegroundWindow
+    original_position=u.SetWindowPos;positions=[]
+    def position(window,*args):
+        positions.append(window)
+        return original_position(window,*args)
     point=[r.left+100,r.bottom-10]
     def cursor(pointer):
         dest=C.cast(pointer,C.POINTER(W.POINT));dest.contents.x=point[0];dest.contents.y=point[1];return True
     try:
         u.GetCursorPos=cursor;u.GetForegroundWindow=lambda:hwnd
+        u.SetWindowPos=position
         root.event_generate('<Motion>',x=100,y=root.winfo_height()-10,rootx=point[0],rooty=point[1]);pump(root,.5)
         state=root.taskbar_reveal
         assert state['height']==r.bottom-task.top and state['height']>0,state
@@ -57,8 +62,10 @@ with tempfile.TemporaryDirectory() as td:
         root.event_generate('<Motion>',x=100,y=root.winfo_height()-10,rootx=point[0],rooty=point[1]);pump(root,.12)
         app.toggle_fullscreen();pump(root)
         assert not state['height'] and state['timer'] is None and state['frame'] is None
+        assert hwnd not in positions,'taskbar hover must never reorder the main window'
     finally:
         u.GetCursorPos=original_cursor;u.GetForegroundWindow=original_foreground
+        u.SetWindowPos=original_position
     assert not errors,errors
     app.close()
     print('PASS icon-only hints; fullscreen reveal, shell promotion, leave/exit and native stacking; no layout resizing')

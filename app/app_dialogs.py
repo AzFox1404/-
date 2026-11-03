@@ -9,6 +9,23 @@ def configure(app):
     global _app
     _app = weakref.ref(app)
 
+def place_window(app,win):
+    """Center new app windows; nested dialogs cascade toward ten o'clock."""
+    if not win.winfo_exists() or getattr(win,'_placed',False):return
+    root=app.root
+    if not root.winfo_viewable():return
+    def descendants(parent):
+        for child in parent.winfo_children():
+            if isinstance(child,tk.Toplevel):yield child
+            yield from descendants(child)
+    floating=set(getattr(app,'windows',{}).values())
+    depth=sum(1 for w in descendants(root) if w is not win and w not in floating and w.winfo_viewable() and not w.overrideredirect())
+    width=max(win.winfo_width(),win.winfo_reqwidth());height=max(win.winfo_height(),win.winfo_reqheight())
+    if hasattr(win,'_placement_size'):width,height=win._placement_size
+    x=root.winfo_rootx()+(root.winfo_width()-width)//2-depth*24
+    y=root.winfo_rooty()+(root.winfo_height()-height)//2-depth*16
+    win._placed=True;win.geometry(f'{width}x{height}{x:+d}{y:+d}')
+
 def action(app,parent,text,key,command):
     button=ttk.Button(parent,text=text,image=app.icon(key),compound='left',
                       style='Compact.TButton',command=command)
@@ -20,9 +37,9 @@ def action(app,parent,text,key,command):
 def modal(app,title,prompt,choices,parent=None,initial=None,validator=None):
     focus=app.root.focus_get()
     owner=(parent or focus or app.root).winfo_toplevel()
-    win=tk.Toplevel(owner);win.title(title);win.transient(owner)
+    win=tk.Toplevel(owner);win.withdraw();win.title(title);win.transient(owner)
     win.geometry('500x200' if initial is not None else '500x170');win.minsize(440,170)
-    result=[None]
+    result=[None];ready=[False]
     row=ttk.Frame(win);row.pack(side='bottom',fill='x',padx=12,pady=10)
     buttons=ttk.Frame(row);buttons.pack(side='right')
     if len(prompt)>500:
@@ -40,6 +57,7 @@ def modal(app,title,prompt,choices,parent=None,initial=None,validator=None):
         error=ttk.Label(win,text='',wraplength=465);error.pack(fill='x',padx=16)
     previous=owner.grab_current()
     def finish(answer):
+        if not ready[0]:return
         if not win.winfo_exists():return
         if entry is not None and answer is True:
             try:answer=validator(value.get()) if validator else value.get()
@@ -52,12 +70,14 @@ def modal(app,title,prompt,choices,parent=None,initial=None,validator=None):
     win.bind('<Escape>',lambda e:finish(None))
     win.bind('<Return>',lambda e:finish(choices[0][2]))
     app.paint(win);win.update_idletasks()
+    if not win.winfo_exists():return result[0]
     width=max(500,buttons.winfo_reqwidth()+30)
     height=max(win.winfo_height(),win.winfo_reqheight()+12)
-    x=owner.winfo_rootx()+(owner.winfo_width()-width)//2
-    y=owner.winfo_rooty()+(owner.winfo_height()-height)//2
-    win.geometry(f'{width}x{height}{x:+d}{y:+d}')
-    win.grab_set();win.lift()
+    win.geometry(f'{width}x{height}')
+    win._placement_size=(width,height)
+    place_window(app,win)
+    win.deiconify();win.grab_set();win.lift()
+    ready[0]=True
     if entry is not None:entry.focus_set();entry.selection_range(0,'end')
     else:buttons.winfo_children()[0].focus_set()
     app.root.wait_window(win)

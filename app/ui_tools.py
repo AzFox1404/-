@@ -42,6 +42,9 @@ class Interface:
                 from windows_integration import close_only
                 close_only(w)
                 detached=w in getattr(self,'windows',{}).values()
+                if not detached:
+                    from app_dialogs import place_window
+                    w.after_idle(lambda target=w:place_window(self,target))
                 if detached and self.root.attributes('-fullscreen'):
                     w._fullscreen_owner=True
                     if str(w.transient())!=str(self.root):w.transient(self.root)
