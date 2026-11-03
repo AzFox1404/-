@@ -145,9 +145,14 @@ def save_records(records,dest):
     folder=dest/f'{seq}. Паспорта'
     staged=Path(tempfile.mkdtemp(dir=dest))
     metadata=[]
+    hashes={}
+    current_path=None
+    reader=None
     try:
         for i,rec in enumerate(records,1):
-            reader=PdfReader(rec['path']);w=PdfWriter()
+            if current_path!=rec['path']:
+                current_path=rec['path'];reader=PdfReader(current_path)
+            w=PdfWriter()
             for n in range(rec['start']-1,rec['end']):
                 page=reader.pages[n];angle=rec.get('rotations',{}).get(str(n),0)
                 if angle:page.rotate(angle)
@@ -158,7 +163,9 @@ def save_records(records,dest):
             if not rec['number'] and not rec['date'] and rec['material']:label=rec['material']
             target=sub/f'{i}. {safe_name(label)}.pdf'
             with target.open('wb') as out:w.write(out)
-            metadata.append({**{k:rec[k] for k in ('source','start','end','type','number','date','material')},'file':str(target.relative_to(staged)), 'source_hash':hashlib.sha256(Path(rec['path']).read_bytes()).hexdigest()})
+            if current_path not in hashes:
+                with Path(current_path).open('rb') as source:hashes[current_path]=hashlib.file_digest(source,'sha256').hexdigest()
+            metadata.append({**{k:rec[k] for k in ('source','start','end','type','number','date','material')},'file':str(target.relative_to(staged)), 'source_hash':hashes[current_path]})
         (staged/'Каталог.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=2),'utf-8')
         staged.rename(folder)
     except Exception:

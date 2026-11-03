@@ -146,7 +146,9 @@ def scanner(app,files=None,destination=None):
                 if other['path']!=r['path']:raise ValueError('Это разные исходные файлы.')
                 r['end']=other['end'];records.pop(idx+1);load(idx);refresh()
             except (ValueError,IndexError) as exc:messagebox.showerror('Объединение',str(exc))
+        saving=[False]
         def finish():
+            if saving[0]:return
             try:
                 commit()
                 for path in set(r['path'] for r in records):
@@ -159,9 +161,31 @@ def scanner(app,files=None,destination=None):
                 if missing and not messagebox.askyesno('Неполные реквизиты',f'У {len(missing)} документов нет номера или полной даты. Вы проверили оригиналы и хотите сохранить именно так?',parent=win):return
                 output=destination or filedialog.askdirectory(parent=win,title='Куда сохранить папку «Паспорта»?',initialdir=str(app.project or app.catalog_dir))
                 if not output:return
-                folder,meta=save_records(chosen,output)
-                app.store_passports(folder,meta)
-                messagebox.showinfo('Готово',f'Сохранено документов: {len(meta)}\n{folder}');win.destroy();tmp.cleanup()
+                saving[0]=True
+                status.set('Сохраняем документы… Можно свернуть окно.')
+                # Keep source temporary files alive until the background save
+                # finishes. Avoid closing/restarting the job while it writes.
+                win.protocol('WM_DELETE_WINDOW',lambda:status.set('Дождитесь завершения сохранения документов.'))
+                results=queue.Queue()
+                snapshot=[dict(record,rotations=dict(record.get('rotations',{}))) for record in chosen]
+                def save():
+                    try:results.put(('ready',save_records(snapshot,output)))
+                    except Exception as exc:results.put(('error',str(exc)))
+                threading.Thread(target=save,daemon=True).start()
+                def saved():
+                    if not win.winfo_exists():return
+                    try:kind,data=results.get_nowait()
+                    except queue.Empty:win.after(50,saved);return
+                    saving[0]=False
+                    win.protocol('WM_DELETE_WINDOW',lambda:(win.destroy(),tmp.cleanup()))
+                    if kind=='error':
+                        status.set('Сохранение не завершено. Можно повторить.')
+                        messagebox.showerror('Сохранение',data,parent=win);return
+                    folder,meta=data
+                    app.store_passports(folder,meta)
+                    messagebox.showinfo('Готово',f'Сохранено документов: {len(meta)}\n{folder}',parent=win)
+                    win.destroy();tmp.cleanup()
+                win.after(50,saved)
             except Exception as exc:messagebox.showerror('Сохранение',str(exc))
         actions=nav
         for key,label,fn in [('cut','Разделить перед текущей страницей',split),('link','Объединить со следующим документом',merge),('save','Сохранить отмеченные документы отдельными PDF',finish)]:

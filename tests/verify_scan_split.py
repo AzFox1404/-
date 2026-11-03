@@ -50,6 +50,8 @@ with tempfile.TemporaryDirectory() as td:
  split.invoke();pump(root);assert len(records)==3 and not dialogs
  buttons['Подтвердить и сохранить'].invoke();pump(root)
  assert not dialogs,dialogs
+ end=time.monotonic()+10
+ while not saved and time.monotonic()<end:pump(root,.05)
  assert saved and len(saved[0][1])==3
  output,meta=saved[0]
  assert [len(PdfReader(output/r['file']).pages) for r in meta]==[2,1,1]

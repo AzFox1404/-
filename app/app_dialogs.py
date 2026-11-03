@@ -11,26 +11,16 @@ def configure(app):
     _app = weakref.ref(app)
 
 def place_window(app,win,settle=False):
-    """Center new app windows; nested dialogs cascade toward ten o'clock."""
+    """Center dialogs on their visible owner, including an independent scanner."""
     if not win.winfo_exists() or getattr(win,'_placed',False) and not settle:return
-    if settle:
-        x,y=getattr(win,'_placement_position',(None,None))
-        if (win.winfo_x(),win.winfo_y())!=(x,y):return
-    root=app.root
+    root=win.master.winfo_toplevel() if win.master is not None else app.root
     if not root.winfo_viewable():return
-    def descendants(parent):
-        for child in parent.winfo_children():
-            if isinstance(child,tk.Toplevel):yield child
-            yield from descendants(child)
-    floating=set(getattr(app,'windows',{}).values())
-    depth=sum(1 for w in descendants(root) if w is not win and w not in floating and w.winfo_viewable() and not w.overrideredirect())
-    if settle:depth=getattr(win,'_placement_depth',depth)
     width=max(win.winfo_width(),win.winfo_reqwidth());height=max(win.winfo_height(),win.winfo_reqheight())
     if hasattr(win,'_placement_size') and not settle:width,height=win._placement_size
-    x=root.winfo_rootx()+(root.winfo_width()-width)//2-depth*24
-    y=root.winfo_rooty()+(root.winfo_height()-height)//2-depth*16
+    x=root.winfo_rootx()+(root.winfo_width()-width)//2
+    y=root.winfo_rooty()+(root.winfo_height()-height)//2
     win._placed=True;win.geometry(f'{x:+d}{y:+d}' if settle else f'{width}x{height}{x:+d}{y:+d}')
-    win._placement_position=(x,y);win._placement_depth=depth
+    win._placement_position=(x,y)
     if not settle:win.after(50,lambda:place_window(app,win,True))
 
 def action(app,parent,text,key,command):
@@ -43,7 +33,11 @@ def action(app,parent,text,key,command):
 
 def modal(app,title,prompt,choices,parent=None,initial=None,validator=None):
     focus=app.root.focus_get()
-    owner=(parent or focus or app.root).winfo_toplevel()
+    target=parent or app.root.grab_current() or focus
+    if target is None:
+        scan=getattr(app,'active_scan',None)
+        target=scan if scan is not None and scan.winfo_exists() and scan.winfo_viewable() else app.root
+    owner=target.winfo_toplevel()
     win=tk.Toplevel(owner);win.withdraw();win.title(title);win.transient(owner)
     win.geometry('500x200' if initial is not None else '500x170');win.minsize(440,170)
     result=[None];ready=[False]

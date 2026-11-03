@@ -315,8 +315,9 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             self.command(n,op);return 'break'
     def populate(self,tree,base,paths):
         opened=self.expanded.get(getattr(tree,'panel_id',-1),set())
+        searching=bool(self.filters.get(getattr(tree,'panel_id',-1),'').strip())
         root_id=str(base.resolve())
-        nodes={base:tree.insert('','end',iid=root_id,text=base.name,values=(str(base),'folder'),open=root_id in opened)}
+        nodes={base:tree.insert('','end',iid=root_id,text=base.name,values=(str(base),'folder'),open=searching or root_id in opened)}
         folders=set()
         for path in paths:
             folders.update(p for p in path.parents if p!=base and p.is_relative_to(base))
@@ -324,7 +325,7 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             folders.update(p for p in base.rglob('*') if p.is_dir())
         for folder in sorted(folders,key=lambda p:(len(p.parts),str(p).casefold())):
             if folder.parent in nodes:
-                nodes[folder]=tree.insert(nodes[folder.parent],'end',iid=str(folder.resolve()),text='└─ '+folder.name,values=(str(folder),'folder'),open=str(folder.resolve()) in opened)
+                nodes[folder]=tree.insert(nodes[folder.parent],'end',iid=str(folder.resolve()),text='└─ '+folder.name,values=(str(folder),'folder'),open=searching or str(folder.resolve()) in opened)
         tree.tag_configure('active',foreground=self.colors['text'],background=self.colors['sel'])
         for path in paths:
             tree.insert(nodes[path.parent],'end',text=('★ ' if self.current and path==self.current.source else '└─ ')+path.stem,values=(str(path),'file'),tags=('active',) if self.current and path==self.current.source else ())

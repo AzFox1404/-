@@ -23,5 +23,7 @@ with tempfile.TemporaryDirectory() as td:
  lb.event_generate('<space>');root.update();assert records[1]['enabled'] is False
  button=next(c for c in all(app.active_scan) if getattr(c,'hint_message','')=='Сохранить отмеченные документы отдельными PDF')
  button.event_generate('<ButtonPress-1>',x=10,y=10);button.event_generate('<ButtonRelease-1>',x=10,y=10);root.update()
+ end=time.monotonic()+10
+ while not app.quality_records() and time.monotonic()<end:root.update();time.sleep(.01)
  assert len(app.quality_records())==1 and len(list((p/'output').rglob('*.pdf')))==1
  app.close();print('PASS scanner keyboard navigation, checkboxes and only checked documents exported')
