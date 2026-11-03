@@ -408,6 +408,7 @@ class Workspace:
         identity=self.current
         retain=getattr(view,'document_identity',None) is identity
         view.document_identity=identity;view.guides=getattr(self.current,'guides',{})
+        view.guides_enabled=any(k.startswith('row') for k in self.models.get(self.current,{}))
         view.show(data,page,retain=retain)
         if had_pages and view._sizes is None:
             view._restore_fraction=(view._generation,page,fraction)

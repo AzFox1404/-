@@ -268,8 +268,8 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         from app_dialogs import action
         actions=ttk.Frame(parent);actions.panel_toolbar=True;actions.pack(fill='x',padx=4,pady=4)
         tree.bind('<Double-1>',lambda e:use())
-        action(self,actions,'Создать проект' if on_home else 'В проект','copy',use).pack(side='left',padx=2)
-        if not on_home:action(self,actions,'Как шаблон','save',self.keep_template).pack(side='left',padx=2)
+        if not on_home:action(self,actions,'Как шаблон','save',self.keep_template).pack(side='right',padx=2)
+        action(self,actions,'Создать проект' if on_home else 'В проект','copy',use).pack(side='right',padx=2)
     def search_tree(self,tree,base,paths,n):
         tree.panel_id=n
         def remember(e):

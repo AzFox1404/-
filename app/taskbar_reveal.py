@@ -15,6 +15,7 @@ def install(root):
     u.FindWindowW.argtypes=[W.LPCWSTR,W.LPCWSTR];u.FindWindowW.restype=W.HWND
     u.GetWindowRect.argtypes=[W.HWND,C.POINTER(W.RECT)]
     u.GetForegroundWindow.restype=W.HWND
+    u.GetWindowThreadProcessId.argtypes=[W.HWND,C.POINTER(W.DWORD)]
     u.GetWindowLongPtrW.argtypes=[W.HWND,C.c_int];u.GetWindowLongPtrW.restype=C.c_ssize_t
     u.SetWindowPos.argtypes=[W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT]
     u.SetWindowRgn.argtypes=[W.HWND,W.HRGN,W.BOOL]
@@ -24,6 +25,10 @@ def install(root):
     initial_bar=u.FindWindowW('Shell_TrayWnd',None)
     state={'height':0,'bar':None,'timer':None,'frame':None,'target':0,'topmost':bool(initial_bar and u.GetWindowLongPtrW(initial_bar,-20)&8),'layered':False}
     root.taskbar_reveal=state
+    def our_window(window):
+        process=W.DWORD();ours=W.DWORD()
+        u.GetWindowThreadProcessId(window,C.byref(process));u.GetWindowThreadProcessId(hwnd,C.byref(ours))
+        return bool(process.value and process.value==ours.value)
 
     def region(height):
         if not height:u.SetWindowRgn(hwnd,None,True);return
@@ -66,7 +71,7 @@ def install(root):
         # Aero Peek/taskbar thumbnails may promote Explorer above fullscreen.
         # Keep the real taskbar immediately below our window while this app is
         # active; clipping then reveals it smoothly and covering always hides it.
-        if foreground in (hwnd,bar):
+        if foreground in (hwnd,bar) or our_window(foreground):
             if inside:
                 if not state['layered'] or u.GetWindowLongPtrW(bar,-20)&8:
                     u.SetWindowPos(bar,C.c_void_p(-2),0,0,0,0,0x13)
