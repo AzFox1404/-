@@ -81,6 +81,7 @@ def analyze_word(path,prepared=None):
     alltext='\n'.join(texts);low=norm(alltext)
     kind='quality' if 'реестр документов качества' in low else 'act' if re.search(r'освидетельствования\s+(скрытых работ|строительных конструкций|ответственных конструкций)',low) else 'registry' if 'реестр исполнительной' in low else 'title' if 'исполнительная документация' in low else 'unknown'
     fields={};claimed=set();targets={};warnings=[];counter=0
+    if kind=='unknown' and re.search(r'\bприказ\b',low) and 'приказываю' in low:kind='order'
     def add(key,label,parts,typ='text'):
         nonlocal counter
         parts=[(i,a,b) for i,a,b in parts if (i,a,b) not in claimed and not calculated(paras[i])]
@@ -241,9 +242,22 @@ def analyze_word(path,prepared=None):
                     add(key,m[1].rstrip(':'),[(i,m.start(2),len(v))])
                 elif re.match(r'^г\.\s',v):add('cityYear','Город и год',[whole(i)])
                 elif v.strip()=='Раздел' and i+1<len(texts):add('section'+str(1+sum(k.startswith('section') for k in fields)),'Раздел',[whole(i+1)])
+    if kind=='order':
+        for i,v in enumerate(texts):
+            m=re.match(r'^(\s*Приказ\s*№\s*)(.*)$',v,re.I)
+            if m:add('orderNumber','Номер приказа',[(i,m.start(2),len(v))])
+            if DATE.fullmatch(v.strip()):add('orderDate','Дата приказа',[whole(i)],'worddate')
+            m=re.search(r'на\s+Объекте\s*:\s*(.+)',v,re.I)
+            if m:add('orderObject','Объект приказа',[(i,m.start(1),m.end(1))])
+            m=re.match(r'\s*Назначить\s+([^,\n]+)',v,re.I)
+            if m:add('orderAppointee','Назначаемое лицо · ФИО в форме документа',[(i,m.start(1),m.end(1))])
+            m=re.match(r'\s*(Генеральный директор|Производитель работ)\s{3,}(\S.*)',v,re.I)
+            if m:add('orderDirector' if m[1].lower().startswith('генеральный') else 'orderAcknowledged',m[1]+' · ФИО',[(i,m.start(2),m.end(2))])
     from manual_fields import apply as apply_manual,revision as manual_revision
+    from sample_forms import apply_word
+    added_samples=apply_word(d,add,claimed,fields)
     added_manual=apply_manual(d,add,claimed)
-    if kind=='unknown' and added_manual:kind='custom'
+    if kind=='unknown' and (added_manual or added_samples):kind='custom'
     if kind=='unknown':
         fields={};targets={}
         warnings.append('Тип формы не распознан. Поля не назначены автоматически, чтобы не изменить постоянный текст.')

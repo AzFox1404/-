@@ -13,7 +13,9 @@ def signature(doc):
  if not labels:labels=[(i,text(p)) for i,p in enumerate(ps)]
  shape=[len(ps),labels,[len(t.rows) for t in doc.tables],[len(t.columns) for t in doc.tables]]
  return hashlib.sha256(json.dumps(shape,ensure_ascii=False).encode()).hexdigest()
-def revision():return hashlib.sha256(FILE.read_bytes() if FILE.exists() else b'').hexdigest()
+def revision():
+ from sample_forms import revision as sample_revision
+ return hashlib.sha256((FILE.read_bytes() if FILE.exists() else b'')+sample_revision().encode()).hexdigest()
 def apply(doc,add,claimed):
  ps=doc._element.body.xpath('.//w:p');applied=False
  for n,r in enumerate(rules().get(signature(doc),[])):
@@ -60,6 +62,8 @@ def dialog(app):
   doc=Document(session.copy if session.copy.suffix.lower()=='.docx' else Path(plan['prepared']).with_name('converted.docx'));ps=doc._element.body.xpath('.//w:p');win=tk.Toplevel(app.root);win.title('Дополнительное поле Word');win.geometry('850x540');win.grab_set()
   ttk.Label(win,text='Автоматические правила сохраняются. Выберите текст значения и выделите точные символы. Пустые места и постоянные подписи не предлагаются.',wraplength=800,padding=10).pack(fill='x')
   candidates=[]
+  from sample_forms import suggestions_word
+  suggestions=suggestions_word(doc)
   for i,p in enumerate(ps):
    v=text(p).strip()
    if not v:
@@ -71,10 +75,12 @@ def dialog(app):
    if re.match(r'^\d+\.\s|^(Приложения|ЗАКАЗЧИК|Объект)\s*:?$',v,re.I):continue
    candidates.append(i)
   lb=tk.Listbox(win,height=8,exportselection=False);lb.pack(fill='both',expand=True,padx=10)
-  for i in candidates:lb.insert('end',text(ps[i])[:180] if text(ps[i]).strip() else 'Пустая подчёркнутая строка после: '+text(ps[i-1])[:100])
+  for i in candidates:lb.insert('end',('Образец: '+suggestions[i]['label']+' · ' if i in suggestions else '')+(text(ps[i])[:180] if text(ps[i]).strip() else 'Пустая подчёркнутая строка после: '+text(ps[i-1])[:100]))
   area=tk.Text(win,height=5,wrap='word');area.pack(fill='x',padx=10)
   def select(e):
-   if lb.curselection():area.delete('1.0','end');area.insert('1.0',text(ps[candidates[lb.curselection()[0]]]))
+   if lb.curselection():
+    i=candidates[lb.curselection()[0]];area.delete('1.0','end');area.insert('1.0',text(ps[i]))
+    proposal=suggestions.get(i);label.set(proposal['label'] if proposal else '')
   lb.bind('<<ListboxSelect>>',select)
   empty=tk.BooleanVar();ttk.Checkbutton(win,text='Подтверждаю: выбранная пустая подчёркнутая строка предназначена для заполнения',variable=empty).pack(anchor='w',padx=10)
   label=tk.StringVar();ttk.Label(win,text='Название нового поля').pack(anchor='w',padx=10);ttk.Entry(win,textvariable=label).pack(fill='x',padx=10)
@@ -111,6 +117,8 @@ def dialog(app):
    content=json.loads(index.read_text('utf-8')) if index.exists() else dict(version=1,complete=False,documents={})
    content['documents'][str(session.copy.relative_to(app.project))]=dict(hash=digest(session.copy),plan=updated)
    temp=index.with_suffix('.tmp');temp.write_text(json.dumps(content,ensure_ascii=False,indent=2),'utf-8');temp.replace(index)
+   from sample_forms import remember,word_profile
+   remember(word_profile(prepared,updated['fields']))
    win.destroy();app.open(session.source,True)
   ttk.Button(win,text='Проверить и сохранить привязку',command=save).pack(anchor='e',padx=10,pady=10)
   win.protocol('WM_DELETE_WINDOW',lambda:(win.destroy(),app.open(session.source,True)));app.paint(win)

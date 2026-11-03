@@ -75,6 +75,8 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         self.filters={};self.search_history={};self.search_redo={};self.saved_rev={};self.history={};self.redo={};self.replaying=False;self.targets={};self.selected={};self.buttons=[]
         self.saved_text=STORE/'Библиотека'/'Исключения.json'
         self.variants=json.loads(self.saved_text.read_text('utf-8')) if self.saved_text.exists() else {}
+        from sample_forms import read,PERSONAL
+        self.personal_variants=read(PERSONAL)
         from template_library import organize
         organize(LIB,SAMPLES.parent/'Шаблоны')
         root.title('Бюро ИД · Проекты');root.geometry('1380x820');root.configure(bg=BG)
@@ -530,7 +532,9 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
                         def focus_insert(e):
                             widget=e.widget;widget.focus_set();widget.icursor('end');widget.selection_range(0,'end');widget.xview('end')
                         w.bind('<<ComboboxSelected>>',focus_insert,add='+')
-                    vals=[v for v in dict.fromkeys([*w.cget('values'),*self.variants.get(key,[]),*self.quality_choices(key)]) if not instruction(v)];w.configure(values=vals)
+                    from sample_forms import personal_choices
+                    personal=personal_choices(key,getattr(self.current,'labels',{}).get(key,LABELS.get(key,'')),self.personal_variants)
+                    vals=[v for v in dict.fromkeys([*w.cget('values'),*self.variants.get(key,[]),*personal,*self.quality_choices(key)]) if not instruction(v)];w.configure(values=vals)
                 if key in ('address','number','start','workStart','clientSign','developerSign'):
                     group={'address':'Общие данные проекта','number':'Акт и участники','start':'Даты работ','workStart':'Даты работ','clientSign':'Подписи','developerSign':'Подписи'}[key]
                     children=w.master.winfo_children();previous=children[children.index(w)-1]

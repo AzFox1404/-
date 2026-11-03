@@ -25,7 +25,8 @@ def fields(path,existing):
    c=s[rule['cell']]
    if c.__class__.__name__=='MergedCell' or c.data_type=='f' or instruction(c.value) or c.coordinate in {v['dest'] for v in existing.values()}:continue
    existing['manualXL'+str(i)]=dict(dest=c.coordinate,value=str(c.value or ''),label=rule['label'],kind='text',prefix='')
-  return existing
+  from sample_forms import apply_excel
+  return apply_excel(s,existing)
  finally:w.close()
 def dialog(app):
  session=app.current
@@ -40,6 +41,8 @@ def dialog(app):
   try:subprocess.run(['powershell.exe','-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',str(Path(__file__).with_name('InspectExcel.ps1')),'-Source',str(session.copy),'-Target',str(inspection)],check=True,capture_output=True,creationflags=subprocess.CREATE_NO_WINDOW,timeout=60)
   except Exception as exc:win.destroy();messagebox.showerror('Анализ XLS',str(exc));return
  w=load_workbook(inspection);s=w.worksheets[0];choices=[]
+ from sample_forms import suggestions_excel
+ suggestions=suggestions_excel(s)
  for row in s:
   for c in row:
    if c.value is None:
@@ -50,8 +53,12 @@ def dialog(app):
    choices.append(c.coordinate+' — '+str(c.value)[:100])
  ttk.Label(win,text='Выберите ячейку со значением. Формулы, пустые места и пояснения не предлагаются.',wraplength=580,padding=12).pack(fill='x')
  lb=tk.Listbox(win,exportselection=False);lb.pack(fill='both',expand=True,padx=12)
- for choice in choices:lb.insert('end',choice)
+ for choice in choices:
+  cell=choice.split(' — ')[0];lb.insert('end',choice+(' · Образец: '+suggestions[cell] if cell in suggestions else ''))
  label=tk.StringVar();ttk.Entry(win,textvariable=label).pack(fill='x',padx=12,pady=6)
+ def propose(e):
+  if lb.curselection():label.set(suggestions.get(choices[lb.curselection()[0]].split(' — ')[0],''))
+ lb.bind('<<ListboxSelect>>',propose)
  def save():
   if not lb.curselection() or not label.get().strip():return
   cell=choices[lb.curselection()[0]].split(' — ')[0]
@@ -59,6 +66,8 @@ def dialog(app):
   import uuid
   field='ID_User_'+uuid.uuid4().hex[:12]
   data=manual_fields.rules();data.setdefault('_names',{})[field]=label.get().strip();data.setdefault(signature(s),[]).append(dict(cell=cell,label=label.get().strip()));manual_fields.FILE.parent.mkdir(parents=True,exist_ok=True);temp=manual_fields.FILE.with_suffix('.tmp');temp.write_text(json.dumps(data,ensure_ascii=False),'utf-8');temp.replace(manual_fields.FILE)
+  from sample_forms import remember,excel_profile
+  remember(excel_profile(s,{field:dict(dest=cell,label=label.get().strip(),kind='text')}))
   win.destroy();w.close()
   def bind():
    import subprocess

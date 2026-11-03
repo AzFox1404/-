@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 from app_dialogs import messagebox
 
-KINDS={'act':'Акт','quality':'Реестр качества','registry':'Реестр','title':'Титул','unknown':'Нужна проверка','custom':'Пользовательская форма'}
+KINDS={'act':'Акт','quality':'Реестр качества','registry':'Реестр','title':'Титул','order':'Приказ','unknown':'Нужна проверка','custom':'Пользовательская форма'}
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 

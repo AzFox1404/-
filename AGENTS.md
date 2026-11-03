@@ -31,6 +31,7 @@ There is no background folder watcher. Synchronization occurs while handling an 
 - Keep at most two warm Office sessions; emit clean PDF before coloured review. Do not mark repeated identical values as edits.
 - Queue registry mutations before waiting for PDF. Counted UI insertion/deletion acts after the current position; deletion stops before the next heading and reports a clipped request after success. Legacy single-row commands keep first-position insertion before the selected first row. Renumber sections without counting headings.
 - User documents and original sample folders must never be modified by tests. Use temporary copies.
+- The user's personal dropdown values live only in private runtime `Библиотека/Личные варианты.json`; preserve them during every update. Never embed them, sample documents, learned private guards or reports in code/default resources/GitHub. `sample_forms.py` contains generic logic only; uncertain matches require manual confirmation.
 
 ## Checks and packaging
 
