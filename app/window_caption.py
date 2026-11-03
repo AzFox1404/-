@@ -52,12 +52,17 @@ def install(window,colors,dark):
             try:apply_frame()
             finally:bar.syncing=False
         def apply_frame():
+            # A withdrawn/unmapped Tk window may still have its temporary
+            # wrapper. Never install a clipping region on that surface.
+            if not window.winfo_ismapped():return
             full=bool(window.attributes('-fullscreen'))
             if full:bar.pack_forget()
             elif not bar.winfo_manager():
                 before=next((w for w in window.winfo_children() if w is not bar and w.winfo_manager()=='pack'),None)
                 bar.pack(fill='x',**({'before':before} if before else {}))
-            style=u.GetWindowLongPtrW(hwnd(),-16)
+            handle=u.GetParent(window.winfo_id())
+            if not handle:return
+            style=u.GetWindowLongPtrW(handle,-16)
             if style & 0x00c00000:
                 u.SetWindowLongPtrW(hwnd(),-16,style & ~0x00c00000)
                 u.SetWindowPos(hwnd(),None,0,0,0,0,0x37)

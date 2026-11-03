@@ -32,7 +32,16 @@ def rounded_frame(window):
     """Clip the non-client frame; leave native client-size calculations intact."""
     u=C.windll.user32;g=C.windll.gdi32
     u.GetParent.argtypes=[W.HWND];u.GetParent.restype=W.HWND
-    hwnd=u.GetParent(window.winfo_id()) or window.winfo_id()
+    hwnd=u.GetParent(window.winfo_id())
+    if not hwnd or not window.winfo_ismapped():return
+    # DWM otherwise paints a separate rectangular frame/shadow outside
+    # the rounded GDI region on Windows 10.
+    if getattr(window,'_unframed_hwnd',None)!=hwnd:
+        attribute=C.windll.dwmapi.DwmSetWindowAttribute
+        attribute.argtypes=[W.HWND,W.DWORD,C.c_void_p,W.DWORD]
+        policy=C.c_int(1)  # DWMNCRP_DISABLED
+        attribute(hwnd,2,C.byref(policy),C.sizeof(policy))
+        window._unframed_hwnd=hwnd
     u.GetWindowRect.argtypes=[W.HWND,C.POINTER(W.RECT)]
     u.IsZoomed.argtypes=[W.HWND]
     u.SetWindowPos.argtypes=[W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT]

@@ -508,7 +508,11 @@ class Workspace:
 
 if __name__=='__main__':
     from studio import Studio
-    root=tk.Tk();Studio(root);root.mainloop()
+    root=tk.Tk()
+    root.withdraw()
+    app=Studio(root)
+    root.deiconify()
+    root.mainloop()
 
 
 
