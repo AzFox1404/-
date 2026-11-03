@@ -39,6 +39,8 @@ class Interface:
                 from glass_resize import install as glass
                 glass(w,self)
             if isinstance(w,tk.Toplevel) and not w.overrideredirect():
+                from windows_integration import theme_caption
+                theme_caption(w,self.colors,self.dark)
                 from windows_integration import close_only
                 close_only(w)
                 detached=w in getattr(self,'windows',{}).values()
@@ -121,6 +123,9 @@ class Interface:
     def paint(self,widget):
         c=self.colors
         def walk(w):
+            if isinstance(w,(tk.Tk,tk.Toplevel)) and not w.overrideredirect():
+                from windows_integration import theme_caption
+                theme_caption(w,c,self.dark)
             if isinstance(w,(ttk.Entry,ttk.Combobox)):
                 from clipboard_keys import install as clipboard_install
                 clipboard_install(w)

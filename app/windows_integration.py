@@ -2,6 +2,22 @@
 import ctypes as C
 from ctypes import wintypes as W
 
+def theme_caption(window,colors,dark):
+    """Native title/frame palette; Windows 10 supports dark/light mode only."""
+    if not window.winfo_exists() or window.overrideredirect():return
+    u=C.WinDLL('user32');d=C.WinDLL('dwmapi')
+    u.GetParent.argtypes=[W.HWND];u.GetParent.restype=W.HWND
+    hwnd=u.GetParent(window.winfo_id()) or window.winfo_id()
+    d.DwmSetWindowAttribute.argtypes=[W.HWND,W.DWORD,C.c_void_p,W.DWORD]
+    def apply(attribute,value):
+        data=W.DWORD(value);return d.DwmSetWindowAttribute(hwnd,attribute,C.byref(data),C.sizeof(data))
+    def rgb(value):
+        value=value.lstrip('#');r,g,b=(int(value[i:i+2],16) for i in (0,2,4));return r|g<<8|b<<16
+    mode=apply(20,int(dark))
+    if mode:mode=apply(19,int(dark))
+    caption=apply(35,rgb(colors['accent']));apply(36,rgb(colors['text']));apply(34,rgb(colors['line']))
+    window.caption_theme=dict(dark=dark,native_colors=caption==0,dark_mode=mode==0)
+
 def normal_window(window):
     window.attributes('-topmost',False)
     def apply():

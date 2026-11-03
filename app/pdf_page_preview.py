@@ -53,6 +53,8 @@ class PagePreview(ttk.Frame):
         x.grid(row=2,column=1,sticky='ew');y.grid(row=1,column=2,sticky='ns');self.canvas.grid(row=1,column=1,sticky='nsew')
         self.ruler_left=tk.Canvas(area,width=20,bg='#eee7df',highlightthickness=0)
         self.ruler_left.grid(row=1,column=0,sticky='ns')
+        self.ruler_bottom=tk.Canvas(area,width=20,height=1,bg='#eee7df',highlightthickness=0)
+        self.ruler_bottom.grid(row=2,column=0,sticky='nsew')
         from pdf_guides import Guides
         self.rulers=Guides(self,self.ruler_top,self.ruler_left)
         self.canvas.bind('<MouseWheel>',self.wheel)
@@ -80,6 +82,7 @@ class PagePreview(ttk.Frame):
             # Release native Tk resources here, not later in a background GC
             # triggered while an Office worker parses the next document.
             self.images.clear();self._bitmap_cache.clear();self.image=None
+            getattr(self,'_retained_pages',{}).clear();self._retained_images=[];self._transition=[]
             self.tiles.reset(True)
             self._quick_fonts.clear()
             self.page_text=None;self.selection.message=None
@@ -119,7 +122,15 @@ class PagePreview(ttk.Frame):
         changed=source!=self.path
         self.path=source;self.number=number;self.rotations=rotations if rotations is not None else {}
         if changed:
-            if not retain:self.tiles.reset(True)
+            self._retain_update=retain
+            if retain and self.pages:
+                records=[]
+                for n,photo in self.images.items():
+                    if n<len(self.pages):
+                        records.append(((n,self.zoom,self.rotations.get(str(n),0),0,0,photo.width(),photo.height()),photo))
+                if records:self._retained_images=records
+            if not retain:
+                self.tiles.reset(True);getattr(self,'_retained_pages',{}).clear();self._retained_images=[]
             else:
                 self.tiles.cache.clear();self.tiles.bytes=0;self.tiles.overviews.clear();self.tiles.overview_pending.clear()
             self.quick_anchors={};self.quick_changes={};self._quick_requested=False;self.quick_notice.configure(text='')
@@ -188,7 +199,22 @@ class PagePreview(ttk.Frame):
         if self.path is None:return
         if self._sizes is None:return
         self._epoch+=1;self.renderer.set_epoch(self._epoch);self._requested.clear()
+        compatible=getattr(self,'_retain_update',False) and len(self.pages)==len(self._sizes)
+        if compatible:
+            for n,(w,h) in enumerate(self._sizes):
+                if self.rotations.get(str(n),0)%180:w,h=h,w
+                if self.pages[n][1:3]!=(max(1,round(w*self.zoom/75)),max(1,round(h*self.zoom/75))):compatible=False;break
+        self._retain_update=False
+        if compatible:
+            # Same document geometry: keep the native canvas frame until each
+            # replacement is ready. No readback, clearing or temporary white page.
+            self._retained_pages=getattr(self,'_retained_pages',{})|dict(self.images)
+            self._transition=[photo for _,photo in self.tiles.visible.values()]
+            self.canvas.addtag_withtag('pdf-transition','pdf-tile');self.canvas.dtag('pdf-tile','pdf-tile')
+            self.images.clear();self.tiles.reset();self._retained_images=[]
+            self.render_visible();return
         previous=[] if draft else [(k,photo) for k,(_,photo) in self.tiles.visible.items() if (k[0],k[2]) not in self.tiles.overviews]
+        if not draft:previous.extend(getattr(self,'_retained_images',[]));self._retained_images=[]
         for n,photo in (() if draft else self.images.items()):
             rotation=self.rotations.get(str(n),0)
             if (n,rotation) in self.tiles.overviews:continue
@@ -357,7 +383,7 @@ class PagePreview(ttk.Frame):
                     self._bitmap_cache[key]=(photo,chars);self._bitmap_bytes+=photo.width()*photo.height()*4
                     while self._bitmap_bytes>48*1024*1024 and self._bitmap_cache:
                         _,(old,_)=self._bitmap_cache.popitem(last=False);self._bitmap_bytes-=old.width()*old.height()*4
-                    self.images[n]=photo;self.selection.pages[n]=dict(x=8,y=self.pages[n][0],w=photo.width(),h=photo.height(),chars=chars,rotation=key[2])
+                    self.images[n]=photo;getattr(self,'_retained_pages',{}).pop(n,None);self.selection.pages[n]=dict(x=8,y=self.pages[n][0],w=photo.width(),h=photo.height(),chars=chars,rotation=key[2])
                     self.canvas.delete('image'+str(n));self.canvas.create_image(8,self.pages[n][0],image=photo,anchor='nw',tags=('image'+str(n),))
                     self.canvas.delete('pdf-transition');self._transition=[]
                     self.render_visible()

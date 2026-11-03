@@ -15,7 +15,8 @@ class Guides:
     def draw(self):
         v=self.v;t=self.top;l=self.left;g=getattr(v,'guides',{})
         enabled=getattr(v,'guides_enabled',g.get('kind')=='excel')
-        widgets=(v.ruler_corner,t,l)
+        if enabled and v.pages and v._sizes is None:return
+        widgets=(v.ruler_corner,t,l,v.ruler_bottom)
         if self.shown!=enabled:
             for widget in widgets:
                 if enabled:widget.grid()
@@ -25,6 +26,8 @@ class Guides:
         if not enabled:return
         for c in widgets:
             c.delete('all');c.create_rectangle(0,0,max(1,c.winfo_width()),max(1,c.winfo_height()),fill='#eee7df',outline='')
+        # Carry the strip through the bottom scrollbar corner as well.
+        v.ruler_bottom.configure(bg='#eee7df')
         if not v.pages or v._sizes is None:return
         numbers=[r['name'] for r in g.get('rows',[])];width=max(18,max((self.font.measure(number) for number in numbers),default=self.font.measure('99'))+8)
         if int(l.cget('width'))!=width:l.configure(width=width);v.ruler_corner.configure(width=width)
@@ -65,6 +68,13 @@ class Guides:
                     l.create_rectangle(0,a,width-1,b,fill='#edcbb2' if number==active else '#eee7df',outline='#b6ada5')
                     if b-a>=10:l.create_text(width/2,(a+b)/2,text=r['name'],font=self.font)
                     self.hits.append((a,b,number))
+            # Decorative continuation only: never invent additional row numbers.
+            edge=max((b for _,b,_ in self.hits),default=0)
+            heights=[b-a for a,b,_ in self.hits if b-a>=10]
+            step=heights[-1] if heights else 20
+            while edge<l.winfo_height():
+                l.create_line(0,edge,width,edge,fill='#b6ada5');edge+=step
+            l.create_line(width-1,0,width-1,l.winfo_height(),fill='#b6ada5')
         else:
             y,w,h,_=v.pages[n];step=72/2.54*scale
             for axis,c,offset,limit in [('x',t,xoff,w),('y',l,y-viewport,h)]:

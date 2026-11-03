@@ -59,9 +59,18 @@ with tempfile.TemporaryDirectory() as td:
   assert not view.ruler_left.winfo_manager() and not view.ruler_top.winfo_manager()
   view.guides_enabled=True;view.canvas.yview_moveto(0);view.rulers.draw();root.update()
   doc[0].insert_text((30,200),'UPDATED');new=doc.tobytes();doc.close()
+  deleted=[];original_delete=view.canvas.delete
+  def track_delete(*tags):
+   if tags==('all',):deleted.append(True)
+   return original_delete(*tags)
+  view.canvas.delete=track_delete
   old=view.canvas.find_all();view.show(new,0,retain=True)
   assert view.canvas.find_all()==old and view.images,'old frame was cleared before replacement'
+  old_guides=view.ruler_left.find_all();view.rulers.draw();assert view.ruler_left.find_all()==old_guides
+  assert view._retained_images,'page pixels must survive the text-layer reset'
   wait(root,lambda:view._sizes is not None and bool(view.images))
+  assert not deleted,'same-geometry refresh must swap page images without clearing canvas'
+  view.canvas.delete=original_delete
   app.library_tree(top);root.update()
   buttons=[c for frame in top.winfo_children() if getattr(frame,'panel_toolbar',False) for c in frame.winfo_children()]
   assert len(buttons)==2 and buttons[0].winfo_y()==buttons[1].winfo_y()

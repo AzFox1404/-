@@ -139,15 +139,30 @@ class FolderOperations:
         try:menu.tk_popup(event.x_root,event.y_root)
         finally:menu.grab_release()
     def folder_drag(self,tree):
-        state=[None]
+        state=[None];ghost=[None]
+        def clear(event=None):
+            state[0]=None
+            if ghost[0] is not None:
+                if ghost[0].winfo_exists():ghost[0].destroy()
+                ghost[0]=None
+        def motion(event):
+            if not state[0]:return
+            source,x,y=state[0]
+            if abs(event.x_root-x)+abs(event.y_root-y)<9:return
+            if ghost[0] is None:
+                win=tk.Toplevel(tree);win.overrideredirect(True);win.attributes('-alpha',.65);win.transient(tree.winfo_toplevel())
+                tk.Label(win,text=source.name,bg=self.colors['sel'],fg=self.colors['text'],padx=10,pady=5).pack()
+                ghost[0]=win;tree.drag_ghost=win
+            ghost[0].geometry(f'{event.x_root+16:+d}{event.y_root+18:+d}');ghost[0].lift()
         def press(event):
+            clear()
             node=tree.identify_row(event.y)
             if node:
                 value=tree.item(node,'values')
                 state[0]=(Path(value[0]),event.x_root,event.y_root) if value else None
         def release(event):
             if not state[0]:return
-            source,x,y=state[0];state[0]=None
+            source,x,y=state[0];clear()
             if abs(event.x_root-x)+abs(event.y_root-y)<9:return
             row=tree.identify_row(event.y)
             values=tree.item(row,'values') if row else ()
@@ -156,3 +171,5 @@ class FolderOperations:
             if parent==source.parent:return
             self.perform_file_operation(source,'move',parent/source.name)
         tree.bind('<ButtonPress-1>',press,add='+');tree.bind('<ButtonRelease-1>',release,add='+')
+        tree.bind('<B1-Motion>',motion,add='+')
+        for event in ('<Escape>','<FocusOut>','<Unmap>','<Destroy>'):tree.bind(event,clear,add='+')
