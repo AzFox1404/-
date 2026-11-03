@@ -152,7 +152,9 @@ class Session:
         finally:
             if process:
                 process.stdin.close()
-                process.wait()
+                try:process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.terminate();process.wait(timeout=5)
             shutil.rmtree(self.preview_dir,ignore_errors=True)
 
 
@@ -382,7 +384,9 @@ class Workspace:
 
     @staticmethod
     def human(iso):
-        return datetime.strptime(iso,'%Y-%m-%d').strftime('%d.%m.%Y') if iso else ''
+        if not iso:return ''
+        try:return datetime.strptime(iso,'%Y-%m-%d').strftime('%d.%m.%Y')
+        except (ValueError,TypeError):return ''
 
     def edit_date(self,s,key,v):
         try:iso=datetime.strptime(v,'%d.%m.%Y').date().isoformat() if v else ''

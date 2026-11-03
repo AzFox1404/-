@@ -40,7 +40,8 @@ class PagePreview(ttk.Frame):
         self.draft_title=ttk.Label(self.draft_area,text='');self.draft_title.pack(fill='x')
         self.draft_text=tk.Text(self.draft_area,height=3,wrap='word',font=('Segoe UI',10),state='disabled')
         scroll=Scrollbar(self.draft_area,command=self.draft_text.yview);scroll.pack(side='right',fill='y')
-        self.draft_text.configure(yscrollcommand=scroll.set);self.draft_text.pack(fill='x',expand=True)
+        self.draft_text.configure(yscrollcommand=scroll.set);self.draft_text.pack(fill='x')
+        self.draft_text.bind('<Configure>',lambda e:self.fit_draft(),add='+')
         def draft_theme():
             self.draft_text.configure(bg='#d3d1d0' if getattr(app,'dark',False) else '#fffdfa',fg='#312b29')
         self.draft_text.redraw_theme=draft_theme;draft_theme()
@@ -310,6 +311,13 @@ class PagePreview(ttk.Frame):
         self.draft_text.insert('1.0',value);self.draft_text.configure(state='disabled')
         self.draft_text.see('end')
         if not self.draft_area.winfo_manager():self.draft_area.pack(fill='x',before=self.quick_area)
+        self.after_idle(self.fit_draft)
+
+    def fit_draft(self):
+        if not self.field_draft:return
+        lines=self.draft_text.count('1.0','end-1c','displaylines')
+        height=max(1,min(8,(lines[0] if lines else 0)+1))
+        if int(self.draft_text.cget('height'))!=height:self.draft_text.configure(height=height)
 
     def clear_draft(self):
         self.field_draft=None;self.draft_area.pack_forget()

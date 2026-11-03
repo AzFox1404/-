@@ -11,6 +11,14 @@ def repaint(widget):
 def install_repaint(canvas):
     if getattr(canvas,'repaint_installed',False):return
     canvas.repaint_installed=True;pending=[None];painting=[False];last=[None]
+    def clip_children(event=None):
+        if event is not None and event.widget is not canvas:return
+        u=C.windll.user32
+        u.GetWindowLongPtrW.argtypes=[W.HWND,C.c_int];u.GetWindowLongPtrW.restype=C.c_ssize_t
+        u.SetWindowLongPtrW.argtypes=[W.HWND,C.c_int,C.c_ssize_t]
+        handle=canvas.winfo_id()
+        u.SetWindowLongPtrW(handle,-16,u.GetWindowLongPtrW(handle,-16)|0x02000000|0x04000000)
+    canvas.bind('<Map>',clip_children,add='+')
     def schedule(*args):
         if painting[0]:return
         current=(canvas.xview(),canvas.yview(),canvas.winfo_width(),canvas.winfo_height())

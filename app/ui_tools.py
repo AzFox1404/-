@@ -296,12 +296,15 @@ class Interface:
         taskbar_install(self.root)
         if not hasattr(self,'_full_safe'):
             self._full_safe=tk.Frame(self.root,height=26,bg=self.colors['bg']);self._full_safe.tone='bg'
-        if active:self._full_safe.pack(side='bottom',fill='x',before=self.root.winfo_children()[0])
+        if active:
+            sibling=next((w for w in self.root.winfo_children() if w is not self._full_safe and w.winfo_manager()=='pack'),None)
+            self._full_safe.pack(side='bottom',fill='x',**({'before':sibling} if sibling else {}))
         else:self._full_safe.pack_forget()
         if not active:self.root.taskbar_reveal['reset']()
         def apply():
             if active:
                 self._before_full=(self.root.geometry(),self.root.state());bounds=monitor_bounds(self.root)
+                self.root.state('normal')
                 self.root.attributes('-fullscreen',True)
                 self.root.after_idle(lambda:cover_monitor(self.root,bounds))
             else:

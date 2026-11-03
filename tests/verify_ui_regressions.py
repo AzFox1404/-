@@ -40,6 +40,10 @@ with tempfile.TemporaryDirectory() as td:
     assert canvas.yview()[0]>0 and canvas.repaint_installed
     for _ in range(15):canvas.yview_scroll(-10,'units');pump(root,.02)
     assert canvas.yview()[0]==0 and field.get()=='Замена'
+    for cycle in range(120):
+        canvas.yview_moveto(cycle%2);root.update_idletasks()
+    canvas.yview_moveto(0);pump(root,.2)
+    assert field.get()=='Замена'
     bars=[w for w in descend(body) if isinstance(w,Scrollbar)];assert bars and bars[0].winfo_width()<=14
     bar=bars[0];bar.event_generate('<Enter>');pump(root,.2);assert bar.hot==1
     bar.event_generate('<Leave>');pump(root,.2);assert bar.hot==0

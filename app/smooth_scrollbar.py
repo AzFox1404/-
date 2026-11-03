@@ -6,7 +6,9 @@ import time
 class Scrollbar(tk.Canvas):
     def __init__(self,master,orient='vertical',command=None,**kwargs):
         self.vertical=orient not in ('horizontal',tk.HORIZONTAL);self.command=command
-        super().__init__(master,highlightthickness=0,bd=0,takefocus=True,**({'width':12} if self.vertical else {'height':12}),**kwargs)
+        kwargs.setdefault('width',12 if self.vertical else 1)
+        kwargs.setdefault('height',1 if self.vertical else 12)
+        super().__init__(master,highlightthickness=0,bd=0,takefocus=True,**kwargs)
         self.first=0.;self.last=1.;self.hot=0.;self.job=None;self.drag=None
         self.bind('<Configure>',lambda e:self.redraw_theme())
         self.bind('<Enter>',lambda e:self.animate(1));self.bind('<Leave>',lambda e:self.animate(0) if self.drag is None else None)
