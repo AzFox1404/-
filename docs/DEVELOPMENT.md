@@ -24,6 +24,7 @@ python tools/check_project.py
 | Переименование / сохранение / скорость переключения | `verify_rename_transaction.py` (Excel), `verify_word_transaction.py` (Word), `verify_journal_baseline.py` |
 | Захват мыши/стекло | `verify_home_drag_release.py`, `verify_glass_resize.py` |
 | Асинхронный PDF/автопрокрутка/fullscreen | `verify_async_pdf.py` |
+| PDF-масштаб без ожидания точных плиток | `verify_pdf_zoom.py` — синтетический А0 по умолчанию; BUREAU_ID_ZOOM_SAMPLE — один локальный образец (читается в временную копию), BUREAU_ID_ZOOM_BASELINE — необязательный старый pdf_page_preview.py для сравнения. История Git для обычной регрессии не нужна |
 | Символы, повороты, OCR, вставка | `verify_pdf_selection.py` (Windows OCR, временные синтетические документы) |
 | Сканер/разделение | `verify_scan_checklist.py`, `verify_scan_split.py` |
 | Нижняя панель ОС / подсказки | `verify_taskbar_hints.py` (виртуальные координаты; без движения мыши пользователя) |

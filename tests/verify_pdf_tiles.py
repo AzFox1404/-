@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory() as td:
  assert shared and all(old[k][1] is v.tiles.visible[k][1] for k in shared),'pan must preserve exact bitmap objects'
  wait(root,lambda:not v.tiles.pending)
  v.set_zoom(135)
- assert v.canvas.find_withtag('pdf-transition'),'zoom must retain a visible previous frame'
+ assert v.canvas.find_withtag('pdf-transition') or v.canvas.find_withtag('pdf-overview'),'zoom must retain a visible previous frame or cached overview'
  wait(root,lambda:bool(v.tiles.visible) and not v.tiles.pending)
  top.destroy();root.update();assert not errors,errors
  app.close();print('PASS A0 visible-only tiles, bounded bitmap memory, cached overview, canonical text geometry, four rotations, scroll and cleanup; same worker and unchanged PDF')

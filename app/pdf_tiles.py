@@ -6,17 +6,19 @@ class Tiles:
     def __init__(self,view):
         self.v=view;self.cache=OrderedDict();self.bytes=0;self.signature=None;self.visible={};self.pending=set();self.serial=0
         self.overviews=OrderedDict();self.overview_pending=set();self.backdrops={};self.text_pending=set();self.backdrop_keys={}
+        self.required=set()
     def reset(self,content=False):
         if self.v.canvas.winfo_exists():self.v.canvas.delete('pdf-tile');self.v.canvas.delete('pdf-overview')
         self.visible.clear();self.backdrops.clear();self.backdrop_keys.clear();self.signature=None;self.pending.clear();self.text_pending.clear()
+        self.required.clear()
         if content:self.cache.clear();self.bytes=0;self.overviews.clear();self.overview_pending.clear()
     def large(self,n):return self.v.pages[n][1]*self.v.pages[n][2]>3_000_000
-    def update(self,pages):
+    def update(self,pages,draft=False):
         v=self.v;c=v.canvas;wanted=[];prefetch=[]
         left=max(0,int(c.canvasx(0)-8));right=left+max(1,c.winfo_width())
         top=c.canvasy(0);bottom=top+max(1,c.winfo_height())
         for n in pages:
-            if not self.large(n):continue
+            if not draft and not self.large(n):continue
             y,w,h,_=v.pages[n];a=max(0,int(top-y));b=min(h,int(bottom-y)+1)
             okey=(n,v.rotations.get(str(n),0))
             if okey in v._text_cache:v.selection.pages[n]=dict(x=8,y=y,w=w,h=h,chars=v._text_cache[okey],rotation=okey[1])
@@ -33,12 +35,14 @@ class Tiles:
                     photo=ImageTk.PhotoImage(crop,master=c);c.delete('overview'+str(n))
                     item=c.create_image(8+x0,y+a,image=photo,anchor='nw',tags=('pdf-overview','overview'+str(n)))
                     c.tag_lower(item);c.tag_raise(item,v.pages[n][3]);self.backdrops[n]=photo
+            if draft:continue
             for ty in range(a//512*512,b,512):
                 for tx in range(left//512*512,min(w,right+1),512):wanted.append((n,v.zoom,v.rotations.get(str(n),0),tx,ty,min(tx+512,w),min(ty+512,h)))
             for ty in range(max(0,a//512*512-512),min(h,b+512),512):
                 for tx in range(max(0,left//512*512-512),min(w,right+512),512):
                     key=(n,v.zoom,v.rotations.get(str(n),0),tx,ty,min(tx+512,w),min(ty+512,h))
                     if key not in wanted:prefetch.append(key)
+        self.required=set(wanted)
         wanted+=prefetch
         signature=tuple(wanted)
         if signature!=self.signature:
@@ -73,7 +77,7 @@ class Tiles:
         while self.bytes>48*1024*1024 and self.cache:
             _,old=self.cache.popitem(last=False);self.bytes-=old.width()*old.height()*4
         if key in (self.signature or ()) and key not in self.visible:self.draw(key,photo)
-        if self.signature and all(k in self.visible for k in self.signature):
+        if self.required and self.required.issubset(self.visible):
             v.canvas.delete('pdf-transition');v._transition=[]
         chars=result['chars'] or v._text_cache.get((n,key[2]),[])
         v._text_cache[(n,key[2])]=chars

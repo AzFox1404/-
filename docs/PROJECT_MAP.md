@@ -22,7 +22,7 @@
 | Быстрый слой / итоговый кэш | `app/fast_preview.py`, `app/final_pdf_cache.py` | `docs/HYBRID_EDITOR.md`; Canvas только для просмотра, кэш только для подтверждённых файлов |
 | Проверка формул | `app/FormulaValidation.ps1` | PreviewWorker, MakeRegistry; контрольные тесты реестров |
 | Крупные PDF-схемы / плитки | `app/pdf_tiles.py` | `tests/verify_pdf_tiles.py`, `docs/PDF_VIEWER_PLAN.md` |
-| Просмотр PDF | `app/pdf_page_preview.py` | `app/pdf_renderer.py` → отдельный `app/pdf_render_worker.py` |
+| Просмотр PDF / интерактивный масштаб | `app/pdf_page_preview.py` (`zoom_frame`, `finish_zoom`) | `app/pdf_tiles.py` — обзор во время колеса; `app/pdf_renderer.py` → отдельный `app/pdf_render_worker.py` |
 | Линейки PDF и номера Excel | `app/pdf_guides.py` | `app/PreviewGuides.ps1` — геометрия Office; только экран |
 | Выделение/OCR PDF-текста | `app/pdf_text_selection.py` | `app/PassportOCR.ps1` |
 | Ctrl+C/V/X/Z/Y, выделение, колесо | `app/clipboard_keys.py`, `app/drag_selection.py`, `app/interactions.py`, `app/auto_scroll.py` | `app/keyboard_navigation.py` |

@@ -15,6 +15,7 @@ class PagePreview(ttk.Frame):
         self.app=app;self.path=None;self.number=0;self.rotations={};self.zoom=70;self.image=None
         self.pages=[];self.images={};self._pending=None;self._sizes=None;self._zoom_job=None;self._wanted_zoom=None;self._text_cache={}
         self._bitmap_cache=OrderedDict();self._bitmap_bytes=0
+        self._zoom_frame=None;self._interactive_zoom=False
         self.quick_values={};self.quick_anchors={};self.quick_changes={};self._quick_requested=False;self._quick_fonts={}
         self.renderer=PDFRenderer();self._generation=0;self._epoch=0;self._requested=set();self._render_poll=None
         from pdf_tiles import Tiles
@@ -61,6 +62,7 @@ class PagePreview(ttk.Frame):
 
     def cleanup(self,event):
         if event.widget is self:
+            if self._zoom_frame is not None:self.after_cancel(self._zoom_frame);self._zoom_frame=None
             self.renderer.close()
             if self._render_poll is not None:self.after_cancel(self._render_poll);self._render_poll=None
             # Release native Tk resources here, not later in a background GC
@@ -101,6 +103,7 @@ class PagePreview(ttk.Frame):
         if same:
             if self.number!=number:self.go_to(number)
             return
+        self.cancel_zoom()
         changed=source!=self.path
         self.path=source;self.number=number;self.rotations=rotations if rotations is not None else {}
         if changed:
@@ -121,18 +124,35 @@ class PagePreview(ttk.Frame):
         self._wanted_zoom=max(25,min(200,level+(10 if event.delta>0 else -10)))
         self._zoom_anchor=(event.x,event.y)
         if self._zoom_job is not None:self.after_cancel(self._zoom_job)
-        def apply():
-            self._zoom_job=None;level=self._wanted_zoom;self._wanted_zoom=None;self.set_zoom(level,self._zoom_anchor)
-        self._zoom_job=self.after(65,apply);return 'break'
+        self._interactive_zoom=True
+        if self._zoom_frame is None:self._zoom_frame=self.after(16,self.zoom_frame)
+        self._zoom_job=self.after(140,self.finish_zoom);return 'break'
 
-    def set_zoom(self,value,anchor=None):
+    def cancel_zoom(self):
+        for name in ('_zoom_frame','_zoom_job'):
+            job=getattr(self,name,None)
+            if job is not None:self.after_cancel(job);setattr(self,name,None)
+        self._wanted_zoom=None;self._interactive_zoom=False
+
+    def zoom_frame(self):
+        self._zoom_frame=None
+        level=self._wanted_zoom;self._wanted_zoom=None
+        if level is not None:self.set_zoom(level,self._zoom_anchor,draft=True)
+
+    def finish_zoom(self):
+        self._zoom_job=None
+        if self._zoom_frame is not None:self.after_cancel(self._zoom_frame);self._zoom_frame=None
+        self.zoom_frame();self._interactive_zoom=False;self.render_visible()
+
+    def set_zoom(self,value,anchor=None,draft=False):
+        if not draft:self.cancel_zoom()
         point=None
         if anchor and self.pages:
             x,y=anchor;cx=self.canvas.canvasx(x);cy=self.canvas.canvasy(y);n=self.page_at(cy);top,w,h,_=self.pages[n]
             point=(n,(cx-8)/w,(cy-top)/h,x,y)
         self.zoom=max(25,min(200,value));self.scale.set(self.zoom)
         if hasattr(self,'on_zoom'):self.on_zoom(self.zoom)
-        self.render(defer=bool(point))
+        self.render(defer=bool(point),draft=draft)
         if point:
             n,fx,fy,x,y=point;top,w,h,_=self.pages[n]
             total=max(p[1] for p in self.pages)+16
@@ -149,15 +169,17 @@ class PagePreview(ttk.Frame):
         self.render_visible()
 
     def rotate(self,degrees):
+        self.cancel_zoom()
         key=str(self.number);self.rotations[key]=(self.rotations.get(key,0)+degrees)%360;self.render()
 
-    def render(self,defer=False):
+    def render(self,defer=False,draft=False):
         if self.path is None:return
         if self._sizes is None:return
-        self._epoch+=1;self.renderer.epoch=self._epoch;self._requested.clear()
-        previous=[(k,photo) for k,(_,photo) in self.tiles.visible.items()]
-        for n,photo in self.images.items():
+        self._epoch+=1;self.renderer.set_epoch(self._epoch);self._requested.clear()
+        previous=[] if draft else [(k,photo) for k,(_,photo) in self.tiles.visible.items() if (k[0],k[2]) not in self.tiles.overviews]
+        for n,photo in (() if draft else self.images.items()):
             rotation=self.rotations.get(str(n),0)
+            if (n,rotation) in self.tiles.overviews:continue
             if self.selection.pages.get(n,{}).get('rotation')==rotation:
                 original_width=self._sizes[n][1] if rotation%180 else self._sizes[n][0]
                 previous.append(((n,photo.width()/original_width*75,rotation,0,0,photo.width(),photo.height()),photo))
@@ -203,7 +225,9 @@ class PagePreview(ttk.Frame):
         visible=set(range(self.page_at(top-160),self.page_at(bottom+160)+1))
         for n in set(self.images)-visible:
             self.canvas.delete('image'+str(n));del self.images[n]
-        self.tiles.update(visible)
+        self.tiles.update(visible,draft=self._interactive_zoom)
+        if self._interactive_zoom:
+            self.number=self.page_at(top);self.update_label();self.rulers.draw();self.draw_quick();return
         missing={n for n in visible-set(self.images) if not self.tiles.large(n)}
         for n in sorted(missing):
             key=(n,self.zoom,self.rotations.get(str(n),0))
@@ -275,36 +299,43 @@ class PagePreview(ttk.Frame):
 
     def poll_renderer(self):
         self._render_poll=None
-        try:
-            # Bound main-thread work per tick too: bitmap transfer is one page.
-            result=self.renderer.results.get_nowait()
-        except queue.Empty:result=None
-        if result is not None and result['generation']==self._generation:
-            if result['op']=='error':self.selection.message.set(result['error'])
-            elif result['op']=='open':
-                self._sizes=result['sizes']
-                if self._sizes:
-                    self.render()
-                    restore=getattr(self,'_restore_fraction',None)
-                    if restore and restore[0]==self._generation:
-                        page=min(restore[1],len(self.pages)-1);top,w,h,_=self.pages[page]
-                        self.canvas.yview_moveto((top+restore[2]*h)/self.height);self.render_visible()
-                    self._restore_fraction=None
-                    if self.quick_values and not self._quick_requested:
-                        self._quick_requested=True;self.renderer.locate(self._generation,self.quick_values)
-                else:self.page_text.set('Пустой PDF')
-            elif result['op']=='locate':self.quick_anchors=result['anchors']
-            elif result['op']=='overview':self.tiles.overview(result)
-            elif result['op']=='tile' and result['epoch']==self._epoch:self.tiles.receive(result)
-            elif result['op']=='page' and result['epoch']==self._epoch:
-                n=result['page'];self._requested.discard((self._epoch,n));key=(n,result['zoom'],result['rotation'])
-                image=Image.frombytes('RGB',result['size'],result['rgb']);photo=ImageTk.PhotoImage(image,master=self.canvas);image.close()
-                chars=self._text_cache.get((n,key[2])) or result['chars'];self._text_cache[(n,key[2])]=chars
-                self._bitmap_cache[key]=(photo,chars);self._bitmap_bytes+=photo.width()*photo.height()*4
-                while self._bitmap_bytes>48*1024*1024 and self._bitmap_cache:
-                    _,(old,_)=self._bitmap_cache.popitem(last=False);self._bitmap_bytes-=old.width()*old.height()*4
-                self.images[n]=photo;self.selection.pages[n]=dict(x=8,y=self.pages[n][0],w=photo.width(),h=photo.height(),chars=chars,rotation=key[2])
-                self.canvas.delete('image'+str(n));self.canvas.create_image(8,self.pages[n][0],image=photo,anchor='nw',tags=('image'+str(n),))
-                self.canvas.delete('pdf-transition');self._transition=[]
-                self.render_visible()
+        import time
+        deadline=time.perf_counter()+.006
+        for _ in range(4):
+            try:
+                result=self.renderer.results.get_nowait()
+            except queue.Empty:break
+            if result is not None and result['generation']==self._generation:
+                if result['op']=='error':self.selection.message.set(result['error'])
+                elif result['op']=='open':
+                    self._sizes=result['sizes']
+                    if self._sizes:
+                        self.render()
+                        restore=getattr(self,'_restore_fraction',None)
+                        if restore and restore[0]==self._generation:
+                            page=min(restore[1],len(self.pages)-1);top,w,h,_=self.pages[page]
+                            self.canvas.yview_moveto((top+restore[2]*h)/self.height);self.render_visible()
+                        self._restore_fraction=None
+                        if self.quick_values and not self._quick_requested:
+                            self._quick_requested=True;self.renderer.locate(self._generation,self.quick_values)
+                    else:self.page_text.set('Пустой PDF')
+                elif result['op']=='locate':self.quick_anchors=result['anchors']
+                elif result['op']=='overview':self.tiles.overview(result)
+                elif result['op']=='tile' and result['epoch']==self._epoch:self.tiles.receive(result)
+                elif result['op']=='page' and result['epoch']==self._epoch:
+                    n=result['page'];self._requested.discard((self._epoch,n));key=(n,result['zoom'],result['rotation'])
+                    image=Image.frombytes('RGB',result['size'],result['rgb']);photo=ImageTk.PhotoImage(image,master=self.canvas)
+                    overview=image.copy();overview.thumbnail((800,800),Image.Resampling.BILINEAR)
+                    self.tiles.overviews[(n,key[2])]=overview
+                    while len(self.tiles.overviews)>4:self.tiles.overviews.popitem(last=False)
+                    image.close()
+                    chars=self._text_cache.get((n,key[2])) or result['chars'];self._text_cache[(n,key[2])]=chars
+                    self._bitmap_cache[key]=(photo,chars);self._bitmap_bytes+=photo.width()*photo.height()*4
+                    while self._bitmap_bytes>48*1024*1024 and self._bitmap_cache:
+                        _,(old,_)=self._bitmap_cache.popitem(last=False);self._bitmap_bytes-=old.width()*old.height()*4
+                    self.images[n]=photo;self.selection.pages[n]=dict(x=8,y=self.pages[n][0],w=photo.width(),h=photo.height(),chars=chars,rotation=key[2])
+                    self.canvas.delete('image'+str(n));self.canvas.create_image(8,self.pages[n][0],image=photo,anchor='nw',tags=('image'+str(n),))
+                    self.canvas.delete('pdf-transition');self._transition=[]
+                    self.render_visible()
+            if time.perf_counter()>=deadline:break
         if self.winfo_exists():self._render_poll=self.after(16,self.poll_renderer)

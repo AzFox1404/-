@@ -1,14 +1,22 @@
 """Nonblocking front end to one isolated, persistent renderer process."""
-import queue,threading,subprocess,pickle,sys
+import queue,threading,subprocess,pickle,sys,time
 from pathlib import Path
 
 class PDFRenderer:
  def __init__(self):
   self.jobs=queue.Queue();self.results=queue.Queue();self.generation=0;self.epoch=0;self.closed=False;self.process=None;self.render_count=0
-  self.thread=threading.Thread(target=self.work,daemon=True);self.thread.start()
   self.viewport=0;self.active_tile=None
+  from collections import deque
+  self.timings=deque(maxlen=128)
+  self.thread=threading.Thread(target=self.work,daemon=True);self.thread.start()
  def open(self,source,generation):
   self.generation=generation;self.jobs.put(dict(op='open',source=source if isinstance(source,bytes) else str(source),generation=generation))
+ def set_epoch(self,epoch):
+  from collections import deque
+  self.epoch=epoch
+  for q in (self.jobs,self.results):
+   with q.mutex:
+    q.queue=deque(j for j in q.queue if j is None or j.get('op') not in ('page','tile') or j.get('overview') or j.get('epoch')==epoch)
  def page(self,generation,epoch,page,zoom,rotation):
   self.jobs.put(dict(op='page',generation=generation,epoch=epoch,page=page,zoom=zoom,rotation=rotation))
  def locate(self,generation,values):
@@ -39,9 +47,12 @@ class PDFRenderer:
     if job is None:break
     if job['generation']!=self.generation or job['op']=='page' and not job.get('overview') and job['epoch']!=self.epoch:continue
     self.active_tile=(job['page'],job['zoom'],job['rotation'],*job['tile']) if 'tile' in job else None
+    started=time.perf_counter()
     pickle.dump(job,p.stdin,protocol=5);p.stdin.flush();result=pickle.load(p.stdout);self.active_tile=None
+    if 'render_ms' in result:
+     self.timings.append(dict(op=result['op'],render_ms=result['render_ms'],roundtrip_ms=round((time.perf_counter()-started)*1000,2)))
     if job['op']=='page':self.render_count+=1
-    if job['generation']==self.generation:self.results.put(result)
+    if job['generation']==self.generation and (job['op']!='page' or job.get('overview') or job['epoch']==self.epoch):self.results.put(result)
   except (OSError,EOFError,BrokenPipeError) as exc:
    if not self.closed:self.results.put(dict(op='error',generation=self.generation,error='Просмотр PDF: '+str(exc)))
   finally:

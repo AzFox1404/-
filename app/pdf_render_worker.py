@@ -1,5 +1,5 @@
 """Isolated PDF renderer. Binary pipe; no Tk, Office or shared native PDF state."""
-import pickle,sys
+import pickle,sys,time
 from collections import OrderedDict
 import pymupdf as fitz
 
@@ -22,6 +22,7 @@ def run():
     from fast_preview import locate
     result=dict(op='locate',generation=req['generation'],anchors=locate(doc,req['values']))
    else:
+    started=time.perf_counter()
     page=doc[req['page']];page.set_rotation((page.rotation+req['rotation'])%360)
     try:
      key=(req['page'],req['rotation'])
@@ -43,7 +44,7 @@ def run():
           r=fitz.Rect(char['bbox'])*matrix;chars.append((char['c'],(r.x0/w,r.y0/h,r.x1/w,r.y1/h)))
         chars.append(('\n',(0,0,0,0)))
       texts[key]=chars if any(c.strip() for c,b in chars) else []
-     result=dict(op='tile' if tile else 'overview' if req.get('overview') else 'page',generation=req['generation'],epoch=req['epoch'],page=req['page'],zoom=req['zoom'],rotation=req['rotation'],size=(pix.width,pix.height),rgb=pix.samples,chars=texts.get(key,[]) if req.get('text',True) else [],tile=tile,overview=req.get('overview',False),viewport=req.get('viewport',0))
+     result=dict(op='tile' if tile else 'overview' if req.get('overview') else 'page',generation=req['generation'],epoch=req['epoch'],page=req['page'],zoom=req['zoom'],rotation=req['rotation'],size=(pix.width,pix.height),rgb=pix.samples,chars=texts.get(key,[]) if req.get('text',True) else [],tile=tile,overview=req.get('overview',False),viewport=req.get('viewport',0),render_ms=round((time.perf_counter()-started)*1000,2))
     finally:page.set_rotation((page.rotation-req['rotation'])%360)
    pickle.dump(result,sys.stdout.buffer,protocol=5);sys.stdout.buffer.flush()
   except Exception as exc:
