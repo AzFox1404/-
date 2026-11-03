@@ -2,7 +2,8 @@
 from pathlib import Path
 import hashlib,json,queue,threading,copy
 import tkinter as tk
-from tkinter import ttk,messagebox
+from tkinter import ttk
+from app_dialogs import messagebox
 
 KINDS={'act':'Акт','quality':'Реестр качества','registry':'Реестр','title':'Титул','unknown':'Нужна проверка','custom':'Пользовательская форма'}
 

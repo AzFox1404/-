@@ -48,11 +48,12 @@ def dialog(app):
   from manual_excel import dialog as excel_dialog
   excel_dialog(app);return
  if session.copy.suffix.lower() not in ('.doc','.docx'):
-  from tkinter import messagebox
+  from app_dialogs import messagebox
   messagebox.showinfo('Привязки','Для известных Excel-форм сохранены действующие правила. Новый редактор привязок пока работает с Word.');return
  old_values=dict(app.models.get(session,{}))
  def ready():
-  from tkinter import ttk,messagebox
+  from tkinter import ttk
+  from app_dialogs import messagebox
   import tkinter as tk
   from word_fields import prepare_word
   plan=prepare_word(session.copy,session.preview_dir/'manual-inspect')

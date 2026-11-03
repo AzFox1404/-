@@ -4,7 +4,8 @@ import tempfile
 import shutil
 import json
 import tkinter as tk
-from tkinter import ttk,messagebox
+from tkinter import ttk
+from app_dialogs import messagebox
 
 class ProjectJournal:
     def __init__(self,project):

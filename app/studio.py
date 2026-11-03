@@ -5,7 +5,8 @@ import shutil
 import uuid
 import zipfile
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, simpledialog
+from tkinter import ttk, filedialog
+from app_dialogs import messagebox, simpledialog
 from workspace_preview import Workspace, Session, ROOT, BG, PAPER, ACCENT, NAMES, LABELS, DATES, SAMPLES
 
 OFFICE={'.doc','.docx','.xls','.xlsx'}
@@ -268,7 +269,8 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             if on_home:self.import_item('file',path)
             else:self.add_copy(path)
         tree.bind('<<TreeviewSelect>>',lambda e:self.selected.update({3:self.tree_selection(tree)}))
-        tree.bind('<Double-1>',lambda e:use());ttk.Button(parent,text='Создать проект из документа' if on_home else 'Скопировать в проект',command=use).pack(fill='x')
+        from app_dialogs import action
+        tree.bind('<Double-1>',lambda e:use());action(self,parent,'Создать проект из документа' if on_home else 'Скопировать в проект','copy',use).pack(anchor='e',padx=8,pady=5)
     def search_tree(self,tree,base,paths,n):
         tree.panel_id=n
         def remember(e):
@@ -357,7 +359,8 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             self.pane_header(n,host)
             self.toolbar(host,n)
             self.library_tree(host)
-            ttk.Button(host,text='Сохранить текущий акт как шаблон',command=self.keep_template).pack(fill='x')
+            from app_dialogs import action
+            action(self,host,'Сохранить как шаблон','save',self.keep_template).pack(anchor='e',padx=8,pady=5)
             self.paint(host);self.root.after_idle(self.enforce_panel_sizes);return
         super().build(n)
         host=self.windows.get(n,self.holders[n])
@@ -397,12 +400,14 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             self.icon_button(line,'link','Назначить дополнительное поле неизвестной формы',lambda:__import__('manual_fields').dialog(self))
             if getattr(self.current,'analysis',None):self.icon_button(line,'help','Проверить распознанные поля и замечания',self.review_word_fields)
             self.icon_button(line,'exception','Сохранить введённый вариант как исключение',self.save_exception)
+            if 'titleAddress' in self.models.get(self.current,{}):
+                self.icon_button(line,'import','Заполнить титул данными выбранного акта проекта',self.title_from_act)
             if self.current in getattr(self,'row_actions',{}):
                 insert,catalog,remove=self.row_actions[self.current]
                 actions=tk.Frame(host,bg='#f6eee8');actions.panel_toolbar=True
                 actions.pack(fill='x',**({'before':before} if before else {}))
-                self.icon_button(actions,'addrow','Добавить одну или несколько позиций · выбрать количество',insert)
-                self.icon_button(actions,'deleterow','Удалить выбранные позиции · Ctrl/Shift для нескольких строк',remove)
+                self.icon_button(actions,'addrow','Добавить указанное количество строк после текущей позиции, перед следующей шапкой',insert)
+                self.icon_button(actions,'deleterow','Удалить указанное количество строк после текущей позиции до следующей шапки. Заголовки сохраняются',remove)
                 self.icon_button(actions,'catalog','Заполнить текущую строку из каталога документов',catalog)
                 if any(k.startswith('part') for k in self.models.get(self.current,{})):
                     self.icon_button(actions,'addsection','Добавить раздел по образцу текущего',lambda:self.register_section(False))
@@ -532,8 +537,6 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         self.row_actions.pop(session,None)
         rows=sorted({int(k.split('_')[0][3:]) for k in vals if k.startswith('row')})
         if not rows:
-            if 'titleAddress' in vals:
-                ttk.Button(parent,text='Взять данные из акта проекта…',command=self.title_from_act).pack(anchor='w',padx=12)
             return vals
         active=self.row_choice.get(session,rows[0])
         if active not in rows:active=min(rows,key=lambda r:abs(r-active))
@@ -544,23 +547,18 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         def select(e):
             row=int(selector.get());self.row_choice[session]=row;self.build(1);self.request_review(session,row=row)
         selector.bind('<<ComboboxSelected>>',select)
-        ttk.Label(parent,text='Позиции для добавления / удаления').pack(anchor='w',padx=10)
-        selection=tk.Listbox(parent,selectmode='extended',exportselection=False,height=4)
-        selection.pack(fill='x',padx=10,pady=3)
-        for r in rows:
-            text=next((str(v) for k,v in vals.items() if k.startswith(f'row{r}_') and str(v).strip()),'Пустая позиция')
-            selection.insert('end',f'{r} · {text[:70]}')
-        selection.selection_set(rows.index(active));selection.see(rows.index(active))
-        ttk.Label(parent,text='Выбор нескольких: Ctrl / Shift',wraplength=180).pack(anchor='w',padx=10)
-        def chosen():return [rows[i] for i in selection.curselection()] or [active]
         def insert():
-            from tkinter import simpledialog
-            count=simpledialog.askinteger('Добавление позиций','Количество новых строк:',initialvalue=len(chosen()),minvalue=1,maxvalue=500,parent=self.root)
-            if count:self.queue_register_operation(session,False,dict(rows=[chosen()[0]],count=count))
+            count=simpledialog.askinteger('Добавление позиций','Сколько строк добавить после текущей позиции?',initialvalue=1,minvalue=1,maxvalue=500,parent=self.root)
+            if count:self.queue_register_operation(session,False,dict(rows=[active],count=count,after=True))
         def remove():
-            selected=chosen()
-            if messagebox.askyesno('Удаление позиций',f'Удалить выбранные позиции ({len(selected)})? Последняя строка будет очищена, чтобы сохранить форму.',parent=self.root):
-                self.queue_register_operation(session,True,dict(rows=selected))
+            count=simpledialog.askinteger('Удаление позиций','Сколько строк удалить после текущей позиции? Шапка следующего раздела сохраняется.',initialvalue=1,minvalue=1,parent=self.root)
+            if not count:return
+            from register_selection import following_rows
+            selected,available=following_rows(vals,active,count)
+            if not selected:
+                messagebox.showinfo('Удаление позиций','После текущей позиции до следующей шапки строк нет.');return
+            notice=f'В разделе нет {count} строк после текущей позиции. Удалено строк: {len(selected)} — до следующей шапки.' if count>available else ''
+            self.queue_register_operation(session,True,dict(rows=selected,notice=notice))
         self.row_actions[session]=(insert,lambda:self.catalog_into_row(session,active),remove)
         parts=[k for k in vals if k.startswith('part') and k[4:].isdigit() and int(k[4:])<=active]
         nearest=max(parts,key=lambda k:int(k[4:])) if parts else None
@@ -568,7 +566,6 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         nearest_group=max(groups,key=lambda k:int(k[5:])) if groups else None
         return {k:v for k,v in vals.items() if (not k.startswith('row') or k.startswith(f'row{active}_')) and (not k.startswith('part') or k==nearest) and (not k.startswith('group') or k==nearest_group)}
     def register_section(self,delete):
-        from tkinter import simpledialog
         s=self.current;vals=self.models.get(s,{})
         row=self.row_choice.get(s,0)
         parts=sorted(int(k[4:]) for k in vals if k.startswith('part') and k[4:].isdigit())
@@ -614,25 +611,37 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         s=self.current
         candidates=[other for other,m in self.models.items() if other.source.is_relative_to(self.project) and 'address' in m and 'project' in m]
         if not candidates:messagebox.showinfo('Титул','Сначала откройте нужный акт проекта.');return
-        win=tk.Toplevel(self.root);win.title('Источник данных титула')
-        def use(other):
+        win=tk.Toplevel(self.root);win.title('Источник данных титула');win.geometry('560x320')
+        from app_dialogs import action
+        action(self,win,'Применить','paste',lambda:use()).pack(side='bottom',anchor='e',padx=12,pady=10)
+        box=tk.Listbox(win,exportselection=False);box.pack(fill='both',expand=True,padx=12,pady=12)
+        for other in candidates:box.insert('end',other.source.stem)
+        box.selection_set(0)
+        def use():
+            if self.current is not s or not box.curselection():return
+            other=candidates[box.curselection()[0]]
             m=self.models[other];vals={'titleAddress':m.get('address',''),'titleClient':m.get('client','')}
             codes=re.findall(r'шифр\s+([^\s;,]+)',m.get('project',''),re.I)
             vals.update({f'code{i}':v for i,v in enumerate(dict.fromkeys(codes),1)})
             for key,val in vals.items():
                 if val and key in self.views:self.views[key].set(val)
             win.destroy()
-        for other in candidates:ttk.Button(win,text=other.source.stem,command=lambda o=other:use(o)).pack(fill='x')
-        self.paint(win)
+        box.bind('<Double-1>',lambda e:use())
+        self.paint(win);win.transient(self.root);win.grab_set()
     def catalog_into_row(self,s,row):
         file=self.catalog_dir/'Документы качества.json'
         items=json.loads(file.read_text('utf-8')) if file.exists() else []
         if not items:messagebox.showinfo('Каталог','Сначала разберите паспорта на главной странице.');return
-        win=tk.Toplevel(self.root);win.title('Документ качества для строки '+str(row))
-        box=tk.Listbox(win,width=85,height=16);box.pack(fill='both',expand=True)
+        win=tk.Toplevel(self.root);win.title('Документ качества для строки '+str(row));win.geometry('660x370')
+        from app_dialogs import action
+        action(self,win,'Заполнить строку','paste',lambda:use()).pack(side='bottom',anchor='e',padx=12,pady=10)
+        body=ttk.Frame(win);body.pack(fill='both',expand=True,padx=12,pady=8)
+        box=tk.Listbox(body,exportselection=False)
+        scroll=ttk.Scrollbar(body,command=box.yview);scroll.pack(side='right',fill='y')
+        box.configure(yscrollcommand=scroll.set);box.pack(fill='both',expand=True)
         for m in items:box.insert('end',f"{m['type']}  {m['number']}  {m['date']}  {m['material']}")
         def use():
-            if not box.curselection():return
+            if self.current is not s or not box.curselection():return
             m=items[box.curselection()[0]]
             vals={'Материал':m['material'],'Вид документа':m['type'],'Наименование документа':m['type'],
                   'Номер':m['number'] or 'б/н','Номер документа':m['number'] or 'б/н','Дата':m['date'],
@@ -642,8 +651,7 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             for k,v in self.views.items():
                 if k.startswith(f'row{row}_') and s.labels[k] in vals:v.set(vals[s.labels[k]])
             win.destroy()
-        ttk.Button(win,text='Заполнить выбранную строку',command=use).pack()
-        self.paint(win)
+        self.paint(win);win.transient(self.root);win.grab_set()
     def focus_field(self,w):
         self.targets[1]=w;self.active_panel=1
         key=next((k for k,v in self.views.items() if str(v)==str(w.cget('textvariable'))),'')

@@ -94,7 +94,7 @@ try{
       else{
        $count=if($b.count){[int]$b.count}else{1};if($count -lt 1 -or $count -gt 500){throw 'Допустимо от 1 до 500 строк.'}
        $target=[int]$targets[-1]
-       for($i=0;$i -lt $count;$i++){$selected=if($excel){AddRegisterPosition $target}else{AddWordRegisterPosition $target};$target=$selected}
+       for($i=0;$i -lt $count;$i++){$selected=if($excel){AddRegisterPosition $target ([bool]$b.after)}else{AddWordRegisterPosition $target $false ([bool]$b.after)};$target=$selected}
       }
      }
     }finally{$deferRegisterSave=$false}

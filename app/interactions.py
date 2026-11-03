@@ -1,7 +1,8 @@
-﻿from pathlib import Path
+from pathlib import Path
 import json
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog
+from app_dialogs import messagebox
 from PIL import Image,ImageDraw,ImageTk
 from win_drop import accept_files
 

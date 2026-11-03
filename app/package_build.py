@@ -1,4 +1,4 @@
-﻿"""Inventory, page accounting and publishing a selected set of project documents."""
+"""Inventory, page accounting and publishing a selected set of project documents."""
 from dataclasses import dataclass
 from pathlib import Path
 from io import BytesIO
@@ -388,7 +388,8 @@ def measure_selection(project,items,cache,options,cancel,progress):
 class PackageDialog:
     def __init__(self,app):
         import tkinter as tk
-        from tkinter import ttk,messagebox,filedialog
+        from tkinter import ttk, filedialog
+        from app_dialogs import messagebox
         import threading
         self.app=app;self.window=tk.Toplevel(app.root);w=self.window;w.title('Сборка исполнительной документации');w.geometry('940x680');w.minsize(900,500)
         app.window_ribbon(w)
@@ -558,7 +559,8 @@ class PackageDialog:
         index=max(0,min(len(files)-1,index));node=files[index]
         self.tree.selection_set(node);self.tree.focus(node);self.tree.see(node)
     def link(self):
-        from tkinter import ttk,messagebox,Toplevel
+        from tkinter import ttk, Toplevel
+        from app_dialogs import messagebox
         node=self.tree.focus()
         if not node.startswith('f'):return
         i=int(node[1:]);it=self.items[i]
@@ -583,7 +585,8 @@ class PackageDialog:
         button=ttk.Button(row,text='Применить',image=self.app.icon('link'),compound='left',style='Compact.TButton',command=choose);button.pack(side='right');__import__('hints').hover_icon(button,self.app,'link');__import__('hints').tooltip(button,'Связать выбранный документ с этим актом');self.app.paint(win)
     def run(self):
         import threading
-        from tkinter import messagebox,filedialog
+        from tkinter import filedialog
+        from app_dialogs import messagebox
         if self.busy:return
         if self.stats_running:self.status.set('Дождитесь завершения подсчёта страниц.');return
         options={k:v.get() for k,v in self.vars.items()};selected=[self.items[i] for i in sorted(self.checked)]

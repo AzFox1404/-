@@ -1,11 +1,12 @@
-﻿"""Review document boundaries and metadata before exporting independent PDFs."""
+"""Review document boundaries and metadata before exporting independent PDFs."""
 import json
 from pathlib import Path
 import queue
 import threading
 import tempfile
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog
+from app_dialogs import messagebox
 from PIL import ImageTk
 import pypdfium2 as pdfium
 from passports import inspect,save_records,TYPES

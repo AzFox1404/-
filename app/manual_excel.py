@@ -2,7 +2,8 @@
 import hashlib,json,re
 from pathlib import Path
 from openpyxl import load_workbook
-from tkinter import ttk,messagebox
+from tkinter import ttk
+from app_dialogs import messagebox
 import tkinter as tk
 import manual_fields
 from office_forms import instruction

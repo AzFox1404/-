@@ -93,13 +93,13 @@ function SetupRegisterPrint($ws){
  }
  $ws.PageSetup.Zoom=$false;$ws.PageSetup.FitToPagesWide=1;$ws.PageSetup.FitToPagesTall=$false
 }
-function AddRegisterPosition([int]$row){
+function AddRegisterPosition([int]$row,[bool]$after=$false){
  $layout=GetRegisterLayout $sheet;$rows=@(GetRegisterRows $sheet $layout)
  if($row -notin $rows){throw 'Выберите строку позиции.'}
  $pageMode=if($layout.general){GetRegisterPageMode $sheet $rows}else{''}
  $atStart=$row -eq $rows[0]
  if($layout.general -and $row -gt $layout.first){$atStart=$atStart -or $sheet.Cells.Item($row-1,1).MergeArea.Columns.Count -gt 1}
- $new=if($atStart){$row}else{$row+1}
+ $new=if($atStart -and !$after){$row}else{$row+1}
  [void]$sheet.Rows.Item($new).Insert()
  $source=if($new -le $row){$row+1}else{$row}
  [void]$sheet.Rows.Item($source).Copy($sheet.Rows.Item($new))

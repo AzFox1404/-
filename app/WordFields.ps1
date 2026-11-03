@@ -33,7 +33,7 @@
   [void]$doc.Bookmarks.Add($name,$range)
  }
 }
-function AddWordRegisterPosition([int]$row,[bool]$delete=$false){
+function AddWordRegisterPosition([int]$row,[bool]$delete=$false,[bool]$after=$false){
  $template=@($special.Keys | Where-Object {$_ -like "row${row}_*"})
  if(!$template){throw 'Выберите строку реестра.'}
  $tableIds=@($special.Keys | Where-Object {$_ -match '^row\d+_'} | ForEach-Object {$special[$_].wordTable} | Sort-Object -Unique)
@@ -46,7 +46,7 @@ function AddWordRegisterPosition([int]$row,[bool]$delete=$false){
   if($positions -le 1){for($c=2;$c -le $table.Rows.Item($row).Cells.Count;$c++){$cell=$table.Rows.Item($row).Cells.Item($c);$calculated=$false;foreach($field in $cell.Range.Fields){if(([string]$field.Code.Text) -match '^\s*='){$calculated=$true}};if(!$calculated){$cell.Range.Text=''}}}else{$table.Rows.Item($row).Delete()}
  }else{
  $first=(@($special.Keys|Where-Object {$_ -match '^row\d+_'}|ForEach-Object {[int]($_.Split('_')[0].Substring(3))}|Sort-Object)[0])
- $new=if($row -eq $first){$row}else{$row+1}
+ $new=if($row -eq $first -and !$after){$row}else{$row+1}
  if($new -le $table.Rows.Count){$null=$table.Rows.Add($table.Rows.Item($new))}else{$null=$table.Rows.Add()}
  $sourceRow=if($new -le $row){$row+1}else{$row}
  $added=$table.Rows.Item($new)

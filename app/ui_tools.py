@@ -1,10 +1,11 @@
-﻿from pathlib import Path
+from pathlib import Path
 import json
 import os
 import re
 import tempfile
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog
+from app_dialogs import messagebox
 from PIL import Image,ImageDraw,ImageTk
 from command_icons import command_icon
 from hints import tooltip
@@ -17,6 +18,8 @@ HELP='Бюро ИД помогает инженеру ПТО заполнить 
 
 class Interface:
     def ui_init(self,store):
+        from app_dialogs import configure
+        configure(self)
         self.catalog_dir=store/'Библиотека';self.prefs_file=store/'Настройки.json'
         try:self.dark=bool(json.loads(self.prefs_file.read_text('utf-8')).get('dark'))
         except (ValueError,OSError):self.dark=False
@@ -133,7 +136,14 @@ class Interface:
                 tooltip(w,hints.get(text,text))
             if hasattr(w,'icon_name'):w.configure(image=self.icon(w.icon_name))
             if isinstance(w,ttk.Button):
-                if not getattr(w,'window_button',False) and w.cget('style') in ('','TButton'):w.configure(style='Action.TButton')
+                if not getattr(w,'window_button',False) and w.cget('style') in ('','TButton','Action.TButton'):
+                    w.configure(style='Compact.TButton')
+                    if str(w.cget('text')).strip() and not w.cget('image'):
+                        text=str(w.cget('text')).casefold()
+                        key=next((icon for word,icon in [('удал','delete'),('отмен','undo'),('сохран','save'),('паспорт','passports'),('каталог','catalog'),('откры','import'),('проект','folder'),('копир','copy')] if word in text),'checkall')
+                        w.icon_name=key;w.configure(image=self.icon(key),compound='left')
+                        from hints import hover_icon
+                        hover_icon(w,self,key)
             if isinstance(w,tk.Scale):w.configure(bg=c['bg'],fg=c['text'],troughcolor=c['line'],activebackground=c['hover'])
             if isinstance(w,(tk.Frame,tk.Label,tk.Button,tk.Listbox,tk.Canvas,tk.PanedWindow,tk.Toplevel,tk.Tk)) and 'background' in w.keys():
                 if w is getattr(self,'canvas',None):return
@@ -375,8 +385,9 @@ class Interface:
         card=ttk.Frame(host,padding=16);card.pack(side='right',fill='y',padx=12,pady=18)
         ttk.Label(card,text='Документы качества',font=('Segoe UI',13,'bold')).pack(anchor='w',pady=4)
         ttk.Label(card,text='PDF, сканы и архивы ZIP',wraplength=185).pack(anchor='w',pady=5)
-        ttk.Button(card,text='Разобрать паспорта',style='Primary.TButton',command=lambda:scanner(self)).pack(anchor='w')
-        ttk.Button(card,text='Каталог документов',command=self.show_catalog).pack(anchor='w',pady=4)
+        from app_dialogs import action
+        action(self,card,'Разобрать паспорта','passports',lambda:scanner(self)).pack(anchor='w')
+        action(self,card,'Каталог документов','catalog',self.show_catalog).pack(anchor='w',pady=4)
     def show_catalog(self):
         cat=self.catalog_dir/'Документы качества.json'
         win=tk.Toplevel(self.root);win.title('Библиотека · Документы качества')

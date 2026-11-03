@@ -9,7 +9,8 @@ import subprocess
 import threading
 import uuid
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog
+from app_dialogs import messagebox
 from datetime import datetime
 from PIL import ImageTk
 import pypdfium2 as pdfium
@@ -118,6 +119,7 @@ class Session:
                         selected=min(candidates,key=lambda n:abs(n-preferred)) if candidates else 0
                         self.preview_context=dict(activeKey='',activeRow=selected)
                         self.events.put((self,'rows',(fields,selected)))
+                        if job.get('notice'):self.events.put((self,'notice',job['notice']))
                     else:
                         fields, revision = job
                 else: revision = 0
@@ -415,7 +417,8 @@ class Workspace:
             if self.sessions.get(s.source) is not s:continue
             if kind in ('rows','error') and getattr(self,'row_wait',None):
                 self.row_wait.destroy();self.row_wait=None
-            if kind=='fields':
+            if kind=='notice':messagebox.showinfo('Реестр',payload,parent=self.root)
+            elif kind=='fields':
                 self.models[s]=payload
                 if getattr(s,'register_repaired',False) and hasattr(self,'mark_changed'):
                     self.mark_changed(s)

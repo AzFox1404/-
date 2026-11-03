@@ -1,8 +1,9 @@
-﻿"""Filesystem operations within a project, covered by its reversible edit journal."""
+"""Filesystem operations within a project, covered by its reversible edit journal."""
 from pathlib import Path
 import json,shutil
 import tkinter as tk
-from tkinter import ttk,simpledialog,messagebox
+from tkinter import ttk
+from app_dialogs import simpledialog, messagebox
 
 class FolderOperations:
     def project_path(self,path,allow_root=False):

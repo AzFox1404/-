@@ -28,6 +28,7 @@ python tools/check_project.py
 | Сканер/разделение | `verify_scan_checklist.py`, `verify_scan_split.py` |
 | Нижняя панель ОС / подсказки | `verify_taskbar_hints.py` (виртуальные координаты; без движения мыши пользователя) |
 | Ленты/вспомогательные окна | `verify_utility_controls.py` |
+| Общие диалоги/главная и подсчёт строк | `verify_app_dialogs.py` (Tk), `verify_counted_rows.py` (сгенерированные Excel/Word, Office) |
 | Панели/полнота иконок | `verify_panel_fit.py`, `verify_panel_preservation.py` (Office + собственные примеры) |
 | Реестр: очередь, первая позиция | `verify_row_queue_and_panels.py` (Excel + собственный общий реестр), `verify_word_first_row.py` (Word + собственное приложение) |
 | Суммы/временные отметки | `verify_review_and_counts.py`, `verify_structural_review.py` (Office + примеры) |
