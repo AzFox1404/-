@@ -7,9 +7,9 @@ def eligible(values,labels):
     for key,value in values.items():
         value=str(value)
         label=labels.get(key,'')
-        if key.startswith('row') or not 3<=len(value)<=80 or '\n' in value:continue
-        if key not in ('number','developer','clientSign','foreman','executorSign','date','start','end') and not re.search(r'Номер|Фамили|ФИО|Дата',label,re.I):continue
+        if not 3<=len(value)<=300 or '\n' in value:continue
         result[key]=value
+        if len(result)>=64:break # Bound whole-PDF anchor search on large registers.
     return result
 
 def locate(doc,values):

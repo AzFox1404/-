@@ -201,6 +201,8 @@ class SaveDecisions:
         self.ask_save('Сохранить изменения в документе «'+s.source.name+'»?',result)
     def save_session(self,s,done):
         """Wait asynchronously for the working copy; never restart Office to save."""
+        if getattr(s,'invalid_inputs',{}):
+            messagebox.showerror('Проверка ввода','Завершите ввод даты или количества листов перед сохранением.');return
         if s in self.pending:self.root.after_cancel(self.pending[s]);self.submit(s)
         wait=tk.Toplevel(self.root);wait.title('Сохранение');wait.transient(self.root)
         ttk.Label(wait,text='Сохраняем документ…',padding=18).pack();self.paint(wait);wait.grab_set()
@@ -233,6 +235,8 @@ class SaveDecisions:
         sessions=[s for s in [*self.sessions.values(),*getattr(self,'retiring_sessions',[])] if self.project and s.source.is_relative_to(self.project)]
         def finish(choice):
             if choice=='cancel':return
+            if choice=='save' and any(getattr(s,'invalid_inputs',{}) for s in sessions):
+                messagebox.showerror('Проверка ввода','Завершите ввод даты или количества листов перед сохранением проекта.');return
             def complete():
                 self.cancel_scan()
                 try:

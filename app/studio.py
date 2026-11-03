@@ -693,8 +693,15 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         session.review_timer=self.root.after(160,refresh)
     def changed(self,s,key,v):
         if getattr(self,'append_popup',{}).get(key,{}).get('active'):return
+        view=getattr(self,'pdf_viewer',None)
+        if s is self.current and not getattr(self,'reference_path',None) and view is not None and view.winfo_exists():
+            view.show_draft(key,v,getattr(s,'labels',{}).get(key,'Поле документа'))
         before=self.revisions[s]
         super().changed(s,key,v)
+        if not hasattr(s,'invalid_inputs'):s.invalid_inputs={}
+        if self.models[s].get(key)!=v:
+            s.invalid_inputs[key]=v;self.journal().dirty.add(s.source)
+        else:s.invalid_inputs.pop(key,None)
         if self.revisions[s]!=before:
             view=getattr(self,'pdf_viewer',None)
             if s is self.current and not getattr(self,'reference_path',None) and view is not None and view.winfo_exists() and view.quick_field(key,v):

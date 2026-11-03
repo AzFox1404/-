@@ -401,6 +401,9 @@ class Workspace:
         review=getattr(self.current,'review_pdf',None)
         if review and review[0]==self.saved_rev.get(self.current):data=review[1]
         view=self.pdf_viewer;had_pages=bool(view.pages)
+        if getattr(view,'document_identity',None) is not self.current:view.clear_draft()
+        draft=view.field_draft
+        if draft and self.saved_rev.get(self.current)==self.revisions.get(self.current) and self.models.get(self.current,{}).get(draft[0])==draft[1]:view.clear_draft()
         snapshot=getattr(self.current,'verified_values',None)
         view.set_quick_model(snapshot[1] if snapshot and snapshot[0]==self.saved_rev.get(self.current) else {},getattr(self.current,'labels',{}))
         page=view.page_at(view.canvas.canvasy(0)) if had_pages else 0

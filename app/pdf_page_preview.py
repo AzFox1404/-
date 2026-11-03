@@ -34,6 +34,15 @@ class PagePreview(ttk.Frame):
         self.ruler_top=tk.Canvas(area,height=20,bg='#eee7df',highlightthickness=0);self.ruler_top.grid(row=0,column=1,sticky='ew')
         self.quick_notice=ttk.Label(self,text='Предварительный вид · вёрстка уточняется',padding=(6,2));self.quick_area=area
         self.quick_notice.configure(text='');self.quick_notice.pack(fill='x',before=area)
+        self.field_draft=None
+        self.draft_area=ttk.Frame(self)
+        self.draft_title=ttk.Label(self.draft_area,text='');self.draft_title.pack(fill='x')
+        self.draft_text=tk.Text(self.draft_area,height=3,wrap='word',font=('Segoe UI',10),state='disabled')
+        scroll=ttk.Scrollbar(self.draft_area,command=self.draft_text.yview);scroll.pack(side='right',fill='y')
+        self.draft_text.configure(yscrollcommand=scroll.set);self.draft_text.pack(fill='x',expand=True)
+        def draft_theme():
+            self.draft_text.configure(bg='#d3d1d0' if getattr(app,'dark',False) else '#fffdfa',fg='#312b29')
+        self.draft_text.redraw_theme=draft_theme;draft_theme()
         self.canvas=tk.Canvas(area,bg='#e6ded8',highlightthickness=0,yscrollincrement=1)
         x=ttk.Scrollbar(area,orient='horizontal',command=self.canvas.xview)
         y=ttk.Scrollbar(area,command=self.canvas.yview)
@@ -266,13 +275,25 @@ class PagePreview(ttk.Frame):
             if values and self._sizes is not None and self.path is not None:
                 self._quick_requested=True;self.renderer.locate(self._generation,values)
 
+    def show_draft(self,key,value,label):
+        """Every keystroke is visible even when precise placement is unproven."""
+        self.field_draft=(key,value)
+        self.draft_title.configure(text=(label or 'Поле документа')+' · ввод, вёрстка уточняется')
+        self.draft_text.configure(state='normal');self.draft_text.delete('1.0','end')
+        self.draft_text.insert('1.0',value);self.draft_text.configure(state='disabled')
+        self.draft_text.see('end')
+        if not self.draft_area.winfo_manager():self.draft_area.pack(fill='x',before=self.quick_area)
+
+    def clear_draft(self):
+        self.field_draft=None;self.draft_area.pack_forget()
+
     def quick_field(self,key,value):
         from fast_preview import family
         from tkinter import font
         def fallback():
             self.quick_changes.pop(key,None);self.draw_quick();return False
         a=self.quick_anchors.get(key)
-        if not a or '\n' in value or len(value)>80 or self.rotations.get(str(a['page']),0):return fallback()
+        if not a or '\n' in value or len(value)>300 or self.rotations.get(str(a['page']),0):return fallback()
         if a['page']>=len(self.pages):return fallback()
         fam=family(a['font'])
         if not fam:return fallback()

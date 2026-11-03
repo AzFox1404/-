@@ -17,5 +17,9 @@ with tempfile.TemporaryDirectory() as td:
     completed=[];app.stop_sessions([s],lambda:completed.append(True),require_saved=True);root.update()
     assert errors and not completed and s.thread.is_alive() and s.tasks.empty() and app.sessions[source] is s
     assert source.read_bytes()==b'original' and not app.stopping
+    s.invalid_inputs={'date':'12.0'};errors.clear()
+    app.save_session(s,lambda:completed.append(True))
+    assert errors and not completed and s.thread.is_alive() and s.tasks.empty()
+    assert source.read_bytes()==b'original' and not app.stopping
     event.set();s.thread.join();root.destroy()
     print('PASS formula rejection preserves source, worker, session and ability to correct/discard')

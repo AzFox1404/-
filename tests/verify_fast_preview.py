@@ -22,6 +22,17 @@ with tempfile.TemporaryDirectory() as td:
     assert 'developer' not in view.quick_anchors,'same text on another page is ambiguous'
     count=view.renderer.render_count;t=time.perf_counter();assert view.quick_field('number','DOC-9');elapsed=(time.perf_counter()-t)*1000
     assert view.renderer.render_count==count and source.read_bytes()==before
+    # All bound unique text fields can use the same guarded path, not only FIO.
+    from fast_preview import eligible
+    assert eligible({'address':'DOCUMENT-1234','row9_2':'Unique material'}, {})=={'address':'DOCUMENT-1234','row9_2':'Unique material'}
+    for value in ('D','DO','DOC','','D'):
+        view.show_draft('number',value,'Номер документа')
+        assert view.draft_text.get('1.0','end-1c')==value
+        assert view.quick_field('number',value)
+    view.show_draft('date','12.0','Дата')
+    assert view.field_draft==('date','12.0') and view.draft_area.winfo_manager()=='pack'
+    view.clear_draft();assert not view.draft_area.winfo_manager()
+    assert view.quick_field('number','DOC-9')
     assert len(view.canvas.find_withtag('quick-edit'))==2 and view.quick_notice.winfo_manager()=='pack'
     assert view.quick_field('number','This string cannot fit into the original field') is False
     assert not view.canvas.find_withtag('quick-edit') and not view.quick_changes
