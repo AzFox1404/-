@@ -29,7 +29,7 @@ class Interface:
             w=event.widget
             if isinstance(w,(ttk.Button,tk.Button,ttk.Menubutton)):
                 label=str(w.cget('text'))
-                meanings={'↗':'Отделить панель','—':'Свернуть окно','□':'Развернуть или восстановить окно','Вернуть':'Вернуть панель в рабочую область'}
+                meanings={'↗':'Отделить панель','—':'Свернуть окно','□':'Развернуть или восстановить окно','Вернуть':'Вернуть панель в рабочую область','×':'Закрыть окно'}
                 tooltip(w,meanings.get(label,label))
         self.root.bind('<Map>',hint_on_map,add='+')
         def mapped(event):
@@ -72,6 +72,7 @@ class Interface:
         self.root.bind('<Configure>',settled,add='+')
     def set_palette(self):
         c=DARK if self.dark else LIGHT;self.colors=c;st=self.style
+        st.configure('Context.TLabel',background=c['glass'],foreground=c['muted'],font=('Segoe UI',10),padding=(8,3))
         st.configure('.',background=c['bg'],foreground=c['text'],fieldbackground=c['paper'])
         for n in ['TEntry','TCombobox','TSpinbox','Treeview']:
             st.configure(n,background=c['paper'],foreground=c['text'],fieldbackground=c['paper'],selectbackground=c['sel'],selectforeground=c['text'],insertcolor=c['text'],arrowcolor=c['text'])
@@ -161,10 +162,14 @@ class Interface:
                     w.bind('<<ComboboxSelected>>',selected,add='+')
             if isinstance(w,(ttk.Button,tk.Button,ttk.Menubutton)):
                 text=str(w.cget('text'))
-                hints={'↗':'Отделить панель в самостоятельное окно','—':'Свернуть окно','□':'Развернуть или восстановить размер','Вернуть':'Вернуть панель в рабочую область'}
+                hints={'↗':'Отделить панель в самостоятельное окно','—':'Свернуть окно','□':'Развернуть или восстановить размер','Вернуть':'Вернуть панель в рабочую область','×':'Закрыть окно'}
                 tooltip(w,hints.get(text,text))
             if hasattr(w,'icon_name'):w.configure(image=self.icon(w.icon_name))
             if isinstance(w,ttk.Button):
+                if not getattr(w,'surface_hover',False):
+                    w.surface_hover=True
+                    w.bind('<Enter>',lambda e:e.widget.state(['active']),add='+')
+                    w.bind('<Leave>',lambda e:e.widget.state(['!active']),add='+')
                 if not getattr(w,'window_button',False) and w.cget('style') in ('','TButton','Action.TButton'):
                     w.configure(style='Compact.TButton')
                     if str(w.cget('text')).strip() and not w.cget('image'):
@@ -206,6 +211,7 @@ class Interface:
         window.transient('');normal_window(window)
         row=tk.Frame(window,bg=self.colors['accent']);row.tone='accent';row.pack(fill='x')
         window.utility_ribbon=row
+        window.bind('<Escape>',self.escape_full,add='+')
         def restore():
             window.deiconify();window.lift()
         def hide():
@@ -271,8 +277,8 @@ class Interface:
             ttk.Separator(row,orient='vertical').pack(side='left',fill='y',padx=4)
             self.toolbar(row,None,inline=True)
         ttk.Separator(row,orient='vertical').pack(side='left',fill='y',padx=6)
-        ttk.Label(row,text='Бюро ИД',font=('Segoe UI',10,'bold')).pack(side='left',padx=4)
-        if in_editor:ttk.Label(row,text=self.project.name if len(self.project.name)<=30 else self.project.name[:27]+'…').pack(side='left',padx=3)
+        self.style.configure('Context.TLabel',background=self.colors['glass'],foreground=self.colors['muted'],font=('Segoe UI',10),padding=(8,3))
+        ttk.Label(row,style='Context.TLabel',text=(self.project.name if len(self.project.name)<=30 else self.project.name[:27]+'…') if in_editor else 'Проекты').pack(side='left',padx=3)
         moon=self.icon_button(row,'moon','Тёмная тема',lambda:self.toggle_theme(1));moon.pack_forget();moon.pack(side='right')
         self.toggle_control(row)
         sun=self.icon_button(row,'sun','Светлая тема',lambda:self.toggle_theme(0));sun.pack_forget();sun.pack(side='right')
@@ -283,28 +289,39 @@ class Interface:
         self.root.bind('<Escape>',self.escape_full,add=False)
 
     def toggle_fullscreen(self):
+        from ui_surface import transition,repaint
         from windows_integration import monitor_bounds,cover_monitor
         active=not self.root.attributes('-fullscreen')
         from taskbar_reveal import install as taskbar_install
         taskbar_install(self.root)
+        if not hasattr(self,'_full_safe'):
+            self._full_safe=tk.Frame(self.root,height=26,bg=self.colors['bg']);self._full_safe.tone='bg'
+        if active:self._full_safe.pack(side='bottom',fill='x',before=self.root.winfo_children()[0])
+        else:self._full_safe.pack_forget()
         if not active:self.root.taskbar_reveal['reset']()
-        if active:
-            self._before_full=(self.root.geometry(),self.root.state());bounds=monitor_bounds(self.root)
-            self.root.attributes('-fullscreen',True)
-            self.root.after_idle(lambda:cover_monitor(self.root,bounds))
-        else:
-            self.root.attributes('-fullscreen',False)
-            if hasattr(self,'_before_full'):
-                geometry,state=self._before_full
-                self.root.state('normal');self.root.geometry(geometry)
-                if state=='zoomed':self.root.state('zoomed')
+        def apply():
+            if active:
+                self._before_full=(self.root.geometry(),self.root.state());bounds=monitor_bounds(self.root)
+                self.root.attributes('-fullscreen',True)
+                self.root.after_idle(lambda:cover_monitor(self.root,bounds))
+            else:
+                self.root.attributes('-fullscreen',False)
+                if hasattr(self,'_before_full'):
+                    geometry,state=self._before_full
+                    self.root.state('normal');self.root.geometry(geometry)
+                    if state=='zoomed':self.root.state('zoomed')
+        transition(self.root,apply)
         for w in self.full_buttons:
             if w.winfo_exists():w.glyph='restore' if active else 'fullscreen';w.redraw_theme()
         for window in getattr(self,'windows',{}).values():
             window._fullscreen_owner=active
             window.transient(self.root if active else '')
             if active:self.root.after(30,lambda w=window:w.lift() if w.winfo_exists() else None)
+        self.root.after_idle(lambda:repaint(self.root))
     def escape_full(self,event=None):
+        window=event.widget.winfo_toplevel() if event is not None else self.root
+        if window is not self.root and window.attributes('-fullscreen'):
+            self.maximize(window);return 'break'
         if self.root.attributes('-fullscreen'):self.toggle_fullscreen();return 'break'
     def limit_home_layout(self):
         layout=getattr(self,'home_layout',None)

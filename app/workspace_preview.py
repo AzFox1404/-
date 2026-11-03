@@ -1,4 +1,5 @@
 """Desktop preview prototype. Office edits a copy and supplies the printed pages."""
+from smooth_scrollbar import Scrollbar
 import itertools
 import json
 import os
@@ -270,7 +271,28 @@ class Workspace:
             self.hidden_windows.clear()
 
     def maximize(self,w):
-        w.state('normal' if w.state()=='zoomed' else 'zoomed')
+        from ui_surface import transition
+        from windows_integration import monitor_bounds,cover_monitor
+        from taskbar_reveal import install
+        install(w)
+        active=bool(w.attributes('-fullscreen'))
+        if active and getattr(w,'_maximize_from_dock',False):
+            n=next((n for n,win in self.windows.items() if win is w),None)
+            if n is not None:self.dock(n);return
+        def apply():
+            if active:
+                w.taskbar_reveal['reset']();w.attributes('-fullscreen',False)
+                w.state('normal');w.geometry(w._before_panel_full)
+                w._bottom_safe.pack_forget()
+            else:
+                if w is not self.root and getattr(self.root,'taskbar_reveal',None):self.root.taskbar_reveal['reset']()
+                w._before_panel_full=w.geometry();w.state('normal')
+                if not hasattr(w,'_bottom_safe'):
+                    w._bottom_safe=tk.Frame(w,height=26,bg=self.colors['bg']);w._bottom_safe.tone='bg'
+                w._bottom_safe.pack(side='bottom',fill='x',before=w.winfo_children()[0])
+                w.attributes('-fullscreen',True);bounds=monitor_bounds(w)
+                w.after_idle(lambda:cover_monitor(w,bounds) if w.winfo_exists() else None)
+        transition(w,apply)
 
     def detach(self,n,maximized=False):
         self.collapsed.discard(n)
@@ -283,8 +305,10 @@ class Workspace:
         for child in host.winfo_children():child.destroy()
         ttk.Button(host,text='Вернуть · '+NAMES[n],command=lambda:self.dock(n)).pack(pady=12)
         win.protocol('WM_DELETE_WINDOW',lambda:self.dock(n))
+        if hasattr(self,'escape_full'):win.bind('<Escape>',self.escape_full,add='+')
         self.build(n)
-        if maximized:win.state('zoomed')
+        if maximized:
+            win._maximize_from_dock=True;self.maximize(win)
 
     def dock(self,n):
         self.collapsed.discard(n)
@@ -328,8 +352,10 @@ class Workspace:
         vals=self.models[s]
         if not vals:
             ttk.Label(b,text='Для этого шаблона ещё не назначены поля.',padding=10).pack();return
-        canvas=tk.Canvas(b,bg=PAPER,highlightthickness=0);self.form_canvas=canvas;scroll=ttk.Scrollbar(b,command=canvas.yview)
-        canvas.configure(yscrollcommand=scroll.set);scroll.pack(side='right',fill='y');canvas.pack(fill='both',expand=True)
+        canvas=tk.Canvas(b,bg=PAPER,highlightthickness=0);self.form_canvas=canvas;scroll=Scrollbar(b,command=canvas.yview)
+        from ui_surface import install_repaint
+        repaint=install_repaint(canvas)
+        canvas.configure(yscrollcommand=lambda a,z:(scroll.set(a,z),repaint()));scroll.pack(side='right',fill='y');canvas.pack(fill='both',expand=True)
         inner=tk.Frame(canvas,bg=PAPER);item=canvas.create_window(0,0,window=inner,anchor='nw')
         inner.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')))
         canvas.bind('<Configure>',lambda e:canvas.itemconfigure(item,width=e.width))

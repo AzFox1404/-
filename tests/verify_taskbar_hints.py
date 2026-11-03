@@ -63,6 +63,15 @@ with tempfile.TemporaryDirectory() as td:
         app.toggle_fullscreen();pump(root)
         assert not state['height'] and state['timer'] is None and state['frame'] is None
         assert hwnd not in positions,'taskbar hover must never reorder the main window'
+        floating=tk.Toplevel(root);app.window_ribbon(floating);pump(root)
+        app.maximize(floating);pump(root)
+        floating_hwnd=u.GetParent(floating.winfo_id()) or floating.winfo_id()
+        u.GetWindowRect(floating_hwnd,C.byref(r));u.GetForegroundWindow=lambda:floating_hwnd
+        point[:]=[r.left+100,r.bottom-10]
+        floating.event_generate('<Motion>',x=100,y=floating.winfo_height()-10,rootx=point[0],rooty=point[1]);pump(root,.5)
+        assert floating.taskbar_reveal['height']>0 and floating._bottom_safe.winfo_height()>=24
+        point[1]=r.top+100;pump(root,.5);assert floating.taskbar_reveal['height']==0
+        app.maximize(floating);pump(root);floating.destroy()
     finally:
         u.GetCursorPos=original_cursor;u.GetForegroundWindow=original_foreground
         u.SetWindowPos=original_position

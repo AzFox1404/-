@@ -81,7 +81,7 @@ class Interactions:
             return 'break'
         def escape(e):
             panel.focus_set()
-            if self.root.attributes('-fullscreen'):self.toggle_fullscreen()
+            self.escape_full(e)
             return 'break'
         self.root.bind_class('FormNavigation','<MouseWheel>',scroll)
         self.root.bind_class('FormNavigation','<Escape>',escape)

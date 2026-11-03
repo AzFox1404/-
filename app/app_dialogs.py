@@ -1,4 +1,5 @@
 """Shared Russian modal dialogs. Native file pickers stay with Windows."""
+from smooth_scrollbar import Scrollbar
 import tkinter as tk
 from tkinter import ttk
 import weakref
@@ -51,7 +52,7 @@ def modal(app,title,prompt,choices,parent=None,initial=None,validator=None):
     if len(prompt)>500:
         body=ttk.Frame(win);body.pack(fill='both',expand=True,padx=16,pady=12)
         area=tk.Text(body,wrap='word',height=12,width=58,bd=0)
-        scroll=ttk.Scrollbar(body,command=area.yview);scroll.pack(side='right',fill='y')
+        scroll=Scrollbar(body,command=area.yview);scroll.pack(side='right',fill='y')
         area.configure(yscrollcommand=scroll.set);area.pack(fill='both',expand=True)
         area.insert('1.0',prompt);area.configure(state='disabled',bg=app.colors['bg'],fg=app.colors['text'])
         win.geometry('500x360')

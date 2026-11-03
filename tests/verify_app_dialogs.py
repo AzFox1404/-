@@ -14,11 +14,14 @@ with tempfile.TemporaryDirectory() as td:
     base=Path(td);studio.STORE=base/'store';studio.PROJECTS=studio.STORE/'Проекты'
     studio.LIB=studio.STORE/'Библиотека/Шаблоны';studio.SAMPLES=base/'missing/sample'
     root=tk.Tk();app=studio.Studio(root);errors=[]
-    root.report_callback_exception=lambda *e:errors.append(str(e[1]))
+    def report(*e):
+        errors.append(str(e[1]));__import__('traceback').print_exception(*e);root.after_idle(root.destroy)
+    root.report_callback_exception=report
     def answer(text=None,label='Применить'):
         win=next(w for w in root.winfo_children() if isinstance(w,tk.Toplevel) and w.winfo_exists())
+        if not win.winfo_viewable():root.after(25,lambda:answer(text,label));return
         assert str(win.transient())==str(root)
-        buttons=[w for w in children(win) if isinstance(w,ttk.Button)]
+        buttons=[w for w in children(win) if isinstance(w,ttk.Button) and not getattr(w,'window_button',False)]
         assert buttons and all(w.cget('image') and w.cget('style')=='Compact.TButton' for w in buttons)
         assert all(w.cget('text') not in ('OK','Cancel') for w in buttons)
         if text is not None:

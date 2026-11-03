@@ -17,11 +17,15 @@ with tempfile.TemporaryDirectory() as td:
  scanner_ui.scanner(app,files=[pdf]);pump(root,.6)
  u=C.windll.user32;u.GetParent.argtypes=[C.c_void_p];u.GetParent.restype=C.c_void_p;u.GetWindowLongPtrW.argtypes=[C.c_void_p,C.c_int];u.GetWindowLongPtrW.restype=C.c_ssize_t
  for win in (dlg.window,app.active_scan):
-  assert len(win.utility_ribbon.winfo_children())==2
+  from tkinter import ttk
+  assert len([c for c in win.utility_ribbon.winfo_children() if isinstance(c,ttk.Button)])==2
   style=u.GetWindowLongPtrW(u.GetParent(win.winfo_id()),-16);assert not style & (0x10000|0x20000) and style & 0x80000
   win.utility_actions['hide']();pump(root);assert win.state()=='iconic' and root.state()!='iconic'
   win.utility_actions['restore']();pump(root);assert win.state()=='normal'
-  app.maximize(win);pump(root);assert win.state()=='zoomed';app.maximize(win);pump(root);assert win.state()=='normal'
+  app.maximize(win);pump(root);assert win.attributes('-fullscreen')
+  win.utility_actions['hide']();pump(root);assert win.state()=='iconic' and root.state()!='iconic'
+  win.utility_actions['restore']();pump(root);assert win.attributes('-fullscreen')
+  app.maximize(win);pump(root);assert not win.attributes('-fullscreen') and win.state()=='normal'
   assert not str(win.transient()) and 'separate' not in win.utility_actions
   assert all(c.has_hint for c in win.utility_ribbon.winfo_children())
  dlg.close_dialog();app.active_scan.tk.call(app.active_scan.protocol('WM_DELETE_WINDOW'));pump(root);app.project=None

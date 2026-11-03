@@ -7,7 +7,7 @@ from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-VERSION=3
+VERSION=4
 MONTHS='января февраля марта апреля мая июня июля августа сентября октября ноября декабря'.split()
 DATE=re.compile(r'[«"“]?\s*\d{1,2}\s*[»"”]?\s*(?:[.\-/]\s*\d{1,2}\s*[.\-/]|(?:'+'|'.join(MONTHS)+r')\s*)\s*\d{4}\s*г?\.?',re.I)
 
@@ -147,7 +147,7 @@ def analyze_word(path,prepared=None):
             else:seen_roles.add(key)
         inline=value.find('\n')
         parts=[]
-        note=re.match(r'^\s*Дополнительные сведения\s*:?\s*(.+)$',value,re.I) if key=='notes' else None
+        note=re.match(r'^\s*Дополнительные сведения(?:\s*:\s*|\s+)([^:\s].*)$',value,re.I|re.S) if key=='notes' else None
         if note:parts=[(i,note.start(1),note.end(1))]
         elif inline>=0 and value[:inline].strip() and value[inline+1:].strip() and not caption(value[inline+1:]) and not heading(value[inline+1:]):parts=[(i,inline+1,len(value.rstrip()))]
         else:

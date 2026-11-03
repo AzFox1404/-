@@ -1,3 +1,4 @@
+from smooth_scrollbar import Scrollbar
 from pathlib import Path
 import json
 import os
@@ -252,7 +253,7 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         frame=ttk.Frame(parent);frame.pack(fill='both',expand=True,padx=4)
         tree=ttk.Treeview(frame,show='tree',height=10)
         tree.column('#0',minwidth=600,width=600,stretch=False)
-        vert=ttk.Scrollbar(frame,orient='vertical',command=tree.yview);horiz=ttk.Scrollbar(frame,orient='horizontal',command=tree.xview)
+        vert=Scrollbar(frame,orient='vertical',command=tree.yview);horiz=Scrollbar(frame,orient='horizontal',command=tree.xview)
         tree.configure(yscrollcommand=vert.set,xscrollcommand=horiz.set)
         horiz.pack(side='bottom',fill='x');vert.pack(side='right',fill='y');tree.pack(fill='both',expand=True)
         paths=docs(LIB)
@@ -338,7 +339,7 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
     def tree(self):
         area=ttk.Frame(self.body[0]);area.pack(expand=True,fill='both')
         tree=ttk.Treeview(area,show='tree');tree.column('#0',width=650,stretch=False)
-        sy=ttk.Scrollbar(area,orient='vertical',command=tree.yview);sx=ttk.Scrollbar(area,orient='horizontal',command=tree.xview)
+        sy=Scrollbar(area,orient='vertical',command=tree.yview);sx=Scrollbar(area,orient='horizontal',command=tree.xview)
         tree.configure(yscrollcommand=sy.set,xscrollcommand=sx.set)
         sx.pack(side='bottom',fill='x');sy.pack(side='right',fill='y');tree.pack(expand=True,fill='both')
         if not self.project:return
@@ -501,6 +502,9 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
                 key=var_keys.get(str(w.cget('textvariable')))
                 if not key:return
                 w.bindtags(('IDCommands',)+w.bindtags())
+                def field_command(op,widget=w):
+                    self.targets[1]=widget;self.command(1,op)
+                w.field_command=field_command
                 w.bind('<FocusIn>',lambda e:self.focus_field(e.widget))
                 from drag_selection import install
                 install(w)
@@ -660,7 +664,7 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         action(self,win,'Заполнить строку','paste',lambda:use()).pack(side='bottom',anchor='e',padx=12,pady=10)
         body=ttk.Frame(win);body.pack(fill='both',expand=True,padx=12,pady=8)
         box=tk.Listbox(body,exportselection=False)
-        scroll=ttk.Scrollbar(body,command=box.yview);scroll.pack(side='right',fill='y')
+        scroll=Scrollbar(body,command=box.yview);scroll.pack(side='right',fill='y')
         box.configure(yscrollcommand=scroll.set);box.pack(fill='both',expand=True)
         for m in items:box.insert('end',f"{m['type']}  {m['number']}  {m['date']}  {m['material']}")
         def use():

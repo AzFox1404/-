@@ -1,4 +1,5 @@
 """Review document boundaries and metadata before exporting independent PDFs."""
+from smooth_scrollbar import Scrollbar
 import json
 from pathlib import Path
 import queue
@@ -49,8 +50,8 @@ def scanner(app,files=None,destination=None):
         left=ttk.Frame(content);right=ttk.Frame(content);content.add(left,minsize=300,width=410,stretch='always');content.add(right,minsize=280,stretch='always')
         listing=ttk.Frame(left);listing.pack(fill='both',expand=True,padx=8)
         lb=tk.Listbox(listing,height=7,exportselection=False)
-        list_y=ttk.Scrollbar(listing,orient='vertical',command=lb.yview)
-        list_x=ttk.Scrollbar(listing,orient='horizontal',command=lb.xview)
+        list_y=Scrollbar(listing,orient='vertical',command=lb.yview)
+        list_x=Scrollbar(listing,orient='horizontal',command=lb.xview)
         lb.configure(yscrollcommand=list_y.set,xscrollcommand=list_x.set)
         listing.rowconfigure(0,weight=1);listing.columnconfigure(0,weight=1)
         lb.grid(row=0,column=0,sticky='nsew');list_y.grid(row=0,column=1,sticky='ns');list_x.grid(row=1,column=0,sticky='ew')
@@ -113,7 +114,7 @@ def scanner(app,files=None,destination=None):
         lb.bind('<Up>',lambda e:(navigate(-1),'break')[1]);lb.bind('<Down>',lambda e:(navigate(1),'break')[1])
         from keyboard_navigation import install as arrow_navigation
         arrow_navigation(win,navigate)
-        nav=ttk.Frame(left);nav.pack(fill='x',padx=8,pady=3,before=listing)
+        nav=win.utility_ribbon
         for key,label,fn in [('up','Предыдущий документ',lambda:navigate(-1)),('down','Следующий документ',lambda:navigate(1)),('checkall','Отметить все документы',lambda:mark_all(True)),('uncheckall','Снять все отметки',lambda:mark_all(False))]:app.icon_button(nav,key,label,fn)
 
         def split():
@@ -155,7 +156,7 @@ def scanner(app,files=None,destination=None):
                 app.store_passports(folder,meta)
                 messagebox.showinfo('Готово',f'Сохранено документов: {len(meta)}\n{folder}');win.destroy();tmp.cleanup()
             except Exception as exc:messagebox.showerror('Сохранение',str(exc))
-        actions=ttk.Frame(left);actions.pack(fill='x',padx=8,pady=6)
+        actions=nav
         for key,label,fn in [('cut','Разделить перед текущей страницей',split),('link','Объединить со следующим документом',merge),('save','Сохранить отмеченные документы отдельными PDF',finish)]:
             app.icon_button(actions,key,label,fn)
         load(0);refresh();app.paint(win)

@@ -6,6 +6,7 @@ Only runs while the bottom 24px trigger or taskbar is in use.
 import ctypes as C
 from ctypes import wintypes as W
 import time
+import tkinter as tk
 
 
 def install(root):
@@ -88,6 +89,9 @@ def install(root):
 
     def motion(event):
         nonlocal hwnd
+        other=event.widget.winfo_toplevel() if hasattr(event,'widget') else None
+        if other is not None and other is not root and other.attributes('-fullscreen'):
+            reset();return
         if state['bar'] or not root.attributes('-fullscreen'):return
         if event.y_root<root.winfo_rooty()+root.winfo_height()-24:return
         # Tk may replace its native wrapper when changing fullscreen styles.
@@ -100,15 +104,17 @@ def install(root):
         state['bar']=bar
         # Poll also covers Explorer's capture during taskbar thumbnail previews.
         poll()
-    root.bind_all('<Motion>',motion,add='+')
+    (root.bind_all if isinstance(root,tk.Tk) else root.bind)('<Motion>',motion,add='+')
     def activated(event):
         # Re-check after native taskbar previews or a click back into the app;
         # Tk can miss Motion while Explorer owns mouse capture.
+        other=event.widget.winfo_toplevel() if hasattr(event,'widget') else None
+        if other is not None and other is not root and other.attributes('-fullscreen'):return
         if root.attributes('-fullscreen') and not state['bar']:
             point=W.POINT();u.GetCursorPos(C.byref(point))
             class Position:pass
             pos=Position();pos.y_root=root.winfo_rooty()+root.winfo_height()
             motion(pos)
-    root.bind_all('<FocusIn>',activated,add='+')
+    (root.bind_all if isinstance(root,tk.Tk) else root.bind)('<FocusIn>',activated,add='+')
     root.bind('<Unmap>',reset,add='+');root.bind('<Destroy>',reset,add='+')
     state['reset']=reset

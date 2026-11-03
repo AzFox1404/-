@@ -1,4 +1,5 @@
 """Continuous PDF preview with visible-page rendering and per-page rotation."""
+from smooth_scrollbar import Scrollbar
 from bisect import bisect_right
 from collections import OrderedDict
 from pathlib import Path
@@ -38,14 +39,14 @@ class PagePreview(ttk.Frame):
         self.draft_area=ttk.Frame(self)
         self.draft_title=ttk.Label(self.draft_area,text='');self.draft_title.pack(fill='x')
         self.draft_text=tk.Text(self.draft_area,height=3,wrap='word',font=('Segoe UI',10),state='disabled')
-        scroll=ttk.Scrollbar(self.draft_area,command=self.draft_text.yview);scroll.pack(side='right',fill='y')
+        scroll=Scrollbar(self.draft_area,command=self.draft_text.yview);scroll.pack(side='right',fill='y')
         self.draft_text.configure(yscrollcommand=scroll.set);self.draft_text.pack(fill='x',expand=True)
         def draft_theme():
             self.draft_text.configure(bg='#d3d1d0' if getattr(app,'dark',False) else '#fffdfa',fg='#312b29')
         self.draft_text.redraw_theme=draft_theme;draft_theme()
         self.canvas=tk.Canvas(area,bg='#e6ded8',highlightthickness=0,yscrollincrement=1)
-        x=ttk.Scrollbar(area,orient='horizontal',command=self.canvas.xview)
-        y=ttk.Scrollbar(area,command=self.canvas.yview)
+        x=Scrollbar(area,orient='horizontal',command=self.canvas.xview)
+        y=Scrollbar(area,command=self.canvas.yview)
         def scrolled(first,last):
             y.set(first,last);self.schedule_visible()
         def horizontal(first,last):x.set(first,last);self.schedule_visible()

@@ -1,4 +1,5 @@
 """Inventory, page accounting and publishing a selected set of project documents."""
+from smooth_scrollbar import Scrollbar
 from dataclasses import dataclass
 from pathlib import Path
 from io import BytesIO
@@ -426,7 +427,7 @@ class PackageDialog:
         arrow_navigation(w,self.move)
         self.tree.heading('#0',text='Раздел / акт / связанные документы');self.tree.heading('role',text='Тип документа')
         self.tree.column('#0',width=650,minwidth=480);self.tree.column('role',width=105,stretch=False)
-        sy=ttk.Scrollbar(area,command=self.tree.yview);sx=ttk.Scrollbar(area,orient='horizontal',command=self.tree.xview)
+        sy=Scrollbar(area,command=self.tree.yview);sx=Scrollbar(area,orient='horizontal',command=self.tree.xview)
         self.tree.configure(yscrollcommand=sy.set,xscrollcommand=sx.set);sx.pack(side='bottom',fill='x');sy.pack(side='right',fill='y');self.tree.pack(fill='both',expand=True)
         self.tree.tag_configure('edit',foreground='#ae633b')
         self.tree.bind('<Button-1>',self.click);self.tree.bind('<space>',lambda e:self.toggle(self.tree.focus()))

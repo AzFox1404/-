@@ -1,4 +1,5 @@
 """Sequential project inspection, cached maps and user review of detected conflicts."""
+from smooth_scrollbar import Scrollbar
 from pathlib import Path
 import hashlib,json,queue,threading,copy
 import tkinter as tk
@@ -114,7 +115,7 @@ class ProjectAnalysis:
         frame=ttk.Frame(win);frame.pack(fill='both',expand=True,padx=12)
         tree=ttk.Treeview(frame,columns=('kind','fields','check'),show='tree headings');tree.heading('#0',text='Документ');tree.column('#0',width=440)
         for key,label,width in [('kind','Тип',130),('fields','Полей',60),('check','Проверка',130)]:tree.heading(key,text=label);tree.column(key,width=width)
-        y=ttk.Scrollbar(frame,command=tree.yview);tree.configure(yscrollcommand=y.set);y.pack(side='right',fill='y');tree.pack(fill='both',expand=True)
+        y=Scrollbar(frame,command=tree.yview);tree.configure(yscrollcommand=y.set);y.pack(side='right',fill='y');tree.pack(fill='both',expand=True)
         notes=tk.StringVar(value='Выберите документ для просмотра замечаний.')
         ttk.Label(win,textvariable=notes,wraplength=850,padding=12).pack(fill='x')
         checked=set(data['documents'])

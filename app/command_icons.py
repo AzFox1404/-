@@ -6,7 +6,9 @@ def command_icon(master,name,color):
     im=Image.new('RGBA',(20*scale,20*scale));d=ImageDraw.Draw(im)
     def line(*pts):d.line([(int(x*scale),int(y*scale)) for x,y in pts],fill=color,width=6,joint='curve')
     def box(x,y,r,b):d.rounded_rectangle(tuple(int(i*scale) for i in (x,y,r,b)),radius=4,outline=color,width=5)
-    if name=='import':
+    if name=='feather':
+        line((4,18),(15,3),(18,2),(17,8),(11,14),(7,14));line((8,11),(13,8));line((10,8),(14,5))
+    elif name=='import':
         line((2,8),(2,5),(7,5),(9,7),(16,7),(16,9));line((2,8),(5,15),(16,15),(18,9),(7,9),(5,15))
     elif name=='export':
         line((9,5),(3,5),(3,16),(15,16),(15,11));line((9,11),(17,3));line((11,3),(17,3),(17,9))
