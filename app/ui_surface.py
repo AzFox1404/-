@@ -58,9 +58,9 @@ def rounded_frame(window):
             if edge is None:return
             if not any(map(int,window.resizable())):return
             handle=u.GetParent(window.winfo_id()) or window.winfo_id()
-            u.SendMessageW.argtypes=[W.HWND,W.UINT,W.WPARAM,W.LPARAM]
-            u.SendMessageW.restype=C.c_ssize_t
-            u.ReleaseCapture();u.SendMessageW(handle,0x112,0xF000+edge,0)
+            u.PostMessageW.argtypes=[W.HWND,W.UINT,W.WPARAM,W.LPARAM]
+            u.PostMessageW.restype=W.BOOL
+            u.ReleaseCapture();u.PostMessageW(handle,0x112,0xF000+edge,0)
             return 'break'
         window.bind('<ButtonPress-1>',resize,add='+');window._frame_resize_bound=True
     u.SetWindowRgn.argtypes=[W.HWND,W.HRGN,W.BOOL]

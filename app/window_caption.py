@@ -11,7 +11,7 @@ def install(window,colors,dark):
     u.GetWindowLongPtrW.argtypes=[W.HWND,C.c_int];u.GetWindowLongPtrW.restype=C.c_ssize_t
     u.SetWindowLongPtrW.argtypes=[W.HWND,C.c_int,C.c_ssize_t]
     u.SetWindowPos.argtypes=[W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT]
-    u.SendMessageW.argtypes=[W.HWND,W.UINT,W.WPARAM,W.LPARAM];u.SendMessageW.restype=C.c_ssize_t
+    u.PostMessageW.argtypes=[W.HWND,W.UINT,W.WPARAM,W.LPARAM];u.PostMessageW.restype=W.BOOL
     def hwnd():return u.GetParent(window.winfo_id()) or window.winfo_id()
     bar=getattr(window,'app_caption',None)
     if bar is None or not bar.winfo_exists():
@@ -30,8 +30,10 @@ def install(window,colors,dark):
         for symbol,command in [('×',close),*([('□',maximize),('—',window.iconify)] if isinstance(window,tk.Tk) else [])]:
             b=ttk.Button(bar,text=symbol,command=command,style='Window.TButton',width=3,takefocus=False);b.window_button=True;b.pack(side='right');buttons.append(b)
         def move(event):
+            # Enter the native move loop only after Tk returns from this callback.
             position=(event.x_root & 0xffff)|((event.y_root & 0xffff)<<16)
-            u.ReleaseCapture();u.SendMessageW(hwnd(),0xA1,2,position)
+            u.ReleaseCapture();u.PostMessageW(hwnd(),0xA1,2,position)
+            return 'break'
         for target in (bar,label,bar.logo):
             target.bind('<ButtonPress-1>',move)
             target.bind('<Double-Button-1>',lambda e=None:maximize() if isinstance(window,tk.Tk) else None)
