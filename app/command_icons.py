@@ -66,6 +66,8 @@ def command_icon(master,name,color):
         line((2,6),(2,3),(8,3),(10,6),(18,6),(18,17),(2,17),(2,6),(18,6))
     elif name=='close':
         box(3,2,15,18);line((7,7),(11,11));line((11,7),(7,11))
+    elif name=='rename':
+        box(2,3,12,17);line((7,13),(9,8),(15,2),(18,5),(12,11),(7,13));line((13,4),(16,7))
     elif name=='delete':
         line((4,5),(16,5));line((7,3),(13,3));line((5,6),(6,17),(14,17),(15,6));line((8,8),(8,14));line((12,8),(12,14))
     elif name=='exception':

@@ -28,6 +28,7 @@ function IsoDate($text){
 . (Join-Path $PSScriptRoot 'WordFields.ps1')
 . (Join-Path $PSScriptRoot 'ReviewHighlight.ps1')
 . (Join-Path $PSScriptRoot 'FormulaValidation.ps1')
+. (Join-Path $PSScriptRoot 'PreviewGuides.ps1')
 $probeBook=$null;$pinned=$false;$app=$null;$doc=$null
 try{
  $excel=[IO.Path]::GetExtension($WorkFile) -in '.xls','.xlsx'
@@ -158,11 +159,12 @@ try{
    if(!$excel){UpdateWordTotals}elseif($special.Keys -match '^row'){$app.CalculateFull()}else{$app.Calculate()}
    if(!$excel -and $PreparedFile){$format=if([IO.Path]::GetExtension($WorkFile) -eq '.doc'){0}else{16};$doc.SaveAs2($WorkFile,$format);$PreparedFile=''}else{$doc.Save()}
    if($excel){$doc.ExportAsFixedFormat(0,[string]$req.pdf)}else{$doc.ExportAsFixedFormat([string]$req.pdf,17)}
+    $previewGuides=GetPreviewGuides
     $cleanReady=$true
    }
    # The clean preview is ready now. Let Tk display it before the more expensive
    # coloured review-copy export, without allowing review colours into the file.
-   Send @{cleanReady=$true;formulaErrors=@(FormulaErrors)}
+   Send @{cleanReady=$true;formulaErrors=@(FormulaErrors);guides=$previewGuides}
    $hasReview=ExportReviewPdf $req
    Send @{ok=$true;hasReview=$hasReview}
   }catch{Send @{error=$_.Exception.Message}}

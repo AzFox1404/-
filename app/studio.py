@@ -266,7 +266,10 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             else:self.add_copy(path)
         tree.bind('<<TreeviewSelect>>',lambda e:self.selected.update({3:self.tree_selection(tree)}))
         from app_dialogs import action
-        tree.bind('<Double-1>',lambda e:use());action(self,parent,'Создать проект из документа' if on_home else 'Скопировать в проект','copy',use).pack(anchor='e',padx=8,pady=5)
+        actions=ttk.Frame(parent);actions.panel_toolbar=True;actions.pack(fill='x',padx=4,pady=4)
+        tree.bind('<Double-1>',lambda e:use())
+        action(self,actions,'Создать проект' if on_home else 'В проект','copy',use).pack(side='left',padx=2)
+        if not on_home:action(self,actions,'Как шаблон','save',self.keep_template).pack(side='left',padx=2)
     def search_tree(self,tree,base,paths,n):
         tree.panel_id=n
         def remember(e):
@@ -355,8 +358,6 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             self.pane_header(n,host)
             self.toolbar(host,n)
             self.library_tree(host)
-            from app_dialogs import action
-            action(self,host,'Сохранить как шаблон','save',self.keep_template).pack(anchor='e',padx=8,pady=5)
             self.paint(host);self.root.after_idle(self.enforce_panel_sizes);return
         super().build(n)
         host=self.windows.get(n,self.holders[n])
@@ -382,6 +383,24 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             shutil.copy2(s.copy,dest);self.build(3);self.status.set('Шаблон сохранён: '+str(dest))
         if not hasattr(self,'saved_rev'):self.saved_rev={}
         finish()
+    def library_change(self,delete):
+        path=Path(self.selected.get(3,''))
+        if not path.is_file() or not path.resolve().is_relative_to(LIB.resolve()):
+            messagebox.showinfo('Библиотека','Выберите файл в папке шаблонов.');return
+        try:
+            if delete:
+                if not messagebox.askyesno('Удаление шаблона',f'Удалить шаблон «{path.name}»?'):return
+                path.unlink()
+            else:
+                name=self.folder_name(path.name)
+                if not name:return
+                target=path.with_name(name)
+                if not target.suffix:target=target.with_suffix(path.suffix)
+                if target==path:return
+                if target.exists():raise ValueError('Такое имя уже существует.')
+                path.rename(target);self.selected[3]=str(target)
+            self.build(3)
+        except (OSError,ValueError) as e:messagebox.showerror('Библиотека',str(e))
     def toolbar(self,host,n,before=None,inline=False):
         if n==1 and getattr(self,'reference_path',None):return
         if n==2:return
@@ -393,6 +412,9 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             self.icon_button(line,'folder','Создать папку в выбранной ветви проекта',self.new_folder)
             self.icon_button(line,'close','Закрыть текущий документ с выбором сохранения',self.close_document)
             self.icon_button(line,'delete','Удалить выбранный документ из проекта',self.delete_document)
+        if n==3:
+            self.icon_button(line,'rename','Переименовать выбранный шаблон',lambda:self.library_change(False))
+            self.icon_button(line,'delete','Удалить выбранный шаблон',lambda:self.library_change(True))
         if n==1:
             self.icon_button(line,'link','Назначить дополнительное поле неизвестной формы',lambda:__import__('manual_fields').dialog(self))
             if getattr(self.current,'analysis',None):self.icon_button(line,'help','Проверить распознанные поля и замечания',self.review_word_fields)

@@ -131,6 +131,7 @@ class Session:
                 process.stdin.flush()
                 response=receive()
                 if response.get('cleanReady'):
+                    self.guides=response.get('guides',{})
                     data=pdf.read_bytes();self.clean_hash=digest(self.copy)
                     self.formula_errors=response.get('formulaErrors',[]);self.validated_revision=revision
                     self.verified_values=(revision,dict(fields))
@@ -404,8 +405,13 @@ class Workspace:
         view.set_quick_model(snapshot[1] if snapshot and snapshot[0]==self.saved_rev.get(self.current) else {},getattr(self.current,'labels',{}))
         page=view.page_at(view.canvas.canvasy(0)) if had_pages else 0
         fraction=(view.canvas.canvasy(0)-view.pages[page][0])/view.pages[page][2] if had_pages else 0
-        view.show(data,page)
-        if had_pages and view.pages:
+        identity=self.current
+        retain=getattr(view,'document_identity',None) is identity
+        view.document_identity=identity;view.guides=getattr(self.current,'guides',{})
+        view.show(data,page,retain=retain)
+        if had_pages and view._sizes is None:
+            view._restore_fraction=(view._generation,page,fraction)
+        elif had_pages and view.pages:
             page=min(page,len(view.pages)-1);y=view.pages[page][0]+fraction*view.pages[page][2]
             view.canvas.yview_moveto(y/view.height)
         elif had_pages:

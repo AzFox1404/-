@@ -27,14 +27,21 @@ class PagePreview(ttk.Frame):
         self.scale=ttk.Combobox(tools,values=(35,50,70,85,100,125,150,200),state='readonly',width=5)
         self.scale.set(self.zoom);self.scale.pack(side='right');self.scale.bind('<<ComboboxSelected>>',lambda e:self.set_zoom(int(self.scale.get())))
         area=ttk.Frame(self);area.pack(fill='both',expand=True)
+        self.ruler_top=tk.Canvas(area,height=23,bg='#eee7df',highlightthickness=0);self.ruler_top.pack(side='top',fill='x')
         self.quick_notice=ttk.Label(self,text='Предварительный вид · вёрстка уточняется',padding=(6,2));self.quick_area=area
+        self.quick_notice.configure(text='');self.quick_notice.pack(fill='x',before=area)
         self.canvas=tk.Canvas(area,bg='#e6ded8',highlightthickness=0,yscrollincrement=1)
         x=ttk.Scrollbar(area,orient='horizontal',command=self.canvas.xview)
         y=ttk.Scrollbar(area,command=self.canvas.yview)
         def scrolled(first,last):
             y.set(first,last);self.schedule_visible()
-        self.canvas.configure(xscrollcommand=x.set,yscrollcommand=scrolled)
+        def horizontal(first,last):x.set(first,last);self.schedule_visible()
+        self.canvas.configure(xscrollcommand=horizontal,yscrollcommand=scrolled)
         x.pack(side='bottom',fill='x');y.pack(side='right',fill='y');self.canvas.pack(fill='both',expand=True)
+        self.ruler_left=tk.Canvas(area,width=34,bg='#eee7df',highlightthickness=0)
+        self.ruler_left.pack(side='left',fill='y',before=self.canvas)
+        from pdf_guides import Guides
+        self.rulers=Guides(self,self.ruler_top,self.ruler_left)
         self.canvas.bind('<MouseWheel>',self.wheel)
         self.canvas.bind('<Control-MouseWheel>',self.zoom_at)
         for key,dx,dy in [('Up',0,-60),('Down',0,60),('Left',-30,0),('Right',30,0)]:
@@ -88,19 +95,24 @@ class PagePreview(ttk.Frame):
         self.page_text.set(f'{self.number+1} / {len(self.pages)}')
         self.image=self.images.get(self.number)
 
-    def show(self,path,number,rotations=None):
+    def show(self,path,number,rotations=None,retain=False):
         source=path if isinstance(path,bytes) else Path(path)
         same=source==self.path and (rotations or {})==self.rotations and bool(self.pages)
         if same:
-            self.number=number;self.selection.clear();self.go_to(number);return
+            if self.number!=number:self.go_to(number)
+            return
         changed=source!=self.path
         self.path=source;self.number=number;self.rotations=rotations if rotations is not None else {}
         if changed:
-            self.tiles.reset(True)
-            self.quick_anchors={};self.quick_changes={};self._quick_requested=False;self.quick_notice.pack_forget()
+            if not retain:self.tiles.reset(True)
+            else:
+                self.tiles.cache.clear();self.tiles.bytes=0;self.tiles.overviews.clear();self.tiles.overview_pending.clear()
+            self.quick_anchors={};self.quick_changes={};self._quick_requested=False;self.quick_notice.configure(text='')
             self._restore_fraction=None
             self._sizes=None;self._text_cache.clear();self._bitmap_cache.clear();self._bitmap_bytes=0
-            self._generation+=1;self.pages=[];self.images.clear();self.canvas.delete('all');self.selection.reset(source)
+            self._generation+=1
+            if not retain:self.pages=[];self.images.clear();self.canvas.delete('all')
+            self.selection.reset(source)
             self.page_text.set("Загрузка PDF…");self.renderer.open(source,self._generation)
         else:self.render()
 
@@ -161,6 +173,7 @@ class PagePreview(ttk.Frame):
         self._transition=[];budget=16*1024*1024
         for key,photo in previous:
             n,z,r,x0,y0,x1,y1=key
+            if n>=len(self.pages):continue
             if r!=self.rotations.get(str(n),0):continue
             factor=self.zoom/z;w=max(1,round(photo.width()*factor));h=max(1,round(photo.height()*factor))
             if w*h*4>budget:continue
@@ -184,7 +197,7 @@ class PagePreview(ttk.Frame):
     def render_visible(self):
         if self._pending is not None:
             self.after_cancel(self._pending);self._pending=None
-        if not self.pages or not self.winfo_exists():return
+        if not self.pages or self._sizes is None or not self.winfo_exists():return
         top=self.canvas.canvasy(0);bottom=top+max(1,self.canvas.winfo_height())
         # Keep only nearby pages as bitmaps; page positions remain in the canvas.
         visible=set(range(self.page_at(top-160),self.page_at(bottom+160)+1))
@@ -213,6 +226,7 @@ class PagePreview(ttk.Frame):
             if n not in visible and not any(k[0]==n for k in self._text_cache):self.selection.pages.pop(n,None)
         self.number=self.page_at(top+min(80,max(0,bottom-top-1)))
         self.update_label()
+        self.rulers.draw()
         self.selection.highlight()
         self.draw_quick()
 
@@ -221,7 +235,7 @@ class PagePreview(ttk.Frame):
         values=eligible(values,labels)
         if values!=self.quick_values:
             self.quick_values=values;self.quick_anchors={};self.quick_changes={};self._quick_requested=False
-            self.quick_notice.pack_forget()
+            self.quick_notice.configure(text='')
             if values and self._sizes is not None and self.path is not None:
                 self._quick_requested=True;self.renderer.locate(self._generation,values)
 
@@ -247,8 +261,8 @@ class PagePreview(ttk.Frame):
         from fast_preview import family
         from tkinter import font
         self.canvas.delete('quick-edit')
-        if not self.quick_changes:self.quick_notice.pack_forget();return
-        self.quick_notice.pack(fill='x',before=self.quick_area)
+        if not self.quick_changes:self.quick_notice.configure(text='');return
+        self.quick_notice.configure(text='Предварительный вид · вёрстка уточняется')
         for key,value in self.quick_changes.items():
             a=self.quick_anchors.get(key)
             if not a or a['page']>=len(self.pages) or self.rotations.get(str(a['page']),0):continue
