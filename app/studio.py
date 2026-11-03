@@ -346,6 +346,9 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         tree.bind('<<TreeviewSelect>>',pick)
         tree.bind('<Button-3>',lambda e:self.document_context(tree,e));self.folder_drag(tree)
     def build(self,n):
+        view=getattr(self,'pdf_viewer',None)
+        if n==2 and not getattr(self,'reference_path',None) and self.current in getattr(self,'latest',{}) and view is not None and view.winfo_exists() and view.master is self.body.get(2) and self.body[2].master is self.windows.get(2,self.holders.get(2)):
+            self.draw();return
         if n==1:self.release_form_variables()
         if n in getattr(self,'collapsed',set()):self.collapsed_dirty.add(n);return
         if n==3:

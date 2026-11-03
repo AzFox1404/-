@@ -17,6 +17,8 @@ class PagePreview(ttk.Frame):
         self._bitmap_cache=OrderedDict();self._bitmap_bytes=0
         self.quick_values={};self.quick_anchors={};self.quick_changes={};self._quick_requested=False;self._quick_fonts={}
         self.renderer=PDFRenderer();self._generation=0;self._epoch=0;self._requested=set();self._render_poll=None
+        from pdf_tiles import Tiles
+        self.tiles=Tiles(self)
         tools=ttk.Frame(self);tools.pack(fill='x')
         for key,label,fn in [('rotateleft','Повернуть текущую страницу на 90° влево',lambda:self.rotate(-90)),
                              ('rotateright','Повернуть текущую страницу на 90° вправо',lambda:self.rotate(90))]:
@@ -57,6 +59,7 @@ class PagePreview(ttk.Frame):
             # Release native Tk resources here, not later in a background GC
             # triggered while an Office worker parses the next document.
             self.images.clear();self._bitmap_cache.clear();self.image=None
+            self.tiles.reset(True)
             self._quick_fonts.clear()
             self.page_text=None;self.selection.message=None
         if event.widget is self and self._zoom_job is not None:
@@ -93,6 +96,7 @@ class PagePreview(ttk.Frame):
         changed=source!=self.path
         self.path=source;self.number=number;self.rotations=rotations if rotations is not None else {}
         if changed:
+            self.tiles.reset(True)
             self.quick_anchors={};self.quick_changes={};self._quick_requested=False;self.quick_notice.pack_forget()
             self._restore_fraction=None
             self._sizes=None;self._text_cache.clear();self._bitmap_cache.clear();self._bitmap_bytes=0
@@ -141,6 +145,7 @@ class PagePreview(ttk.Frame):
         self._epoch+=1;self.renderer.epoch=self._epoch;self._requested.clear()
         self.number=max(0,min(len(self._sizes)-1,self.number));self.pages=[];self.starts=[];y=8;max_width=0
         self.canvas.delete('all');self.images.clear()
+        self.tiles.reset()
         for n,(w,h) in enumerate(self._sizes):
             if self.rotations.get(str(n),0)%180:w,h=h,w
             w=max(1,round(w*self.zoom/75));h=max(1,round(h*self.zoom/75))
@@ -169,7 +174,8 @@ class PagePreview(ttk.Frame):
         visible=set(range(self.page_at(top-160),self.page_at(bottom+160)+1))
         for n in set(self.images)-visible:
             self.canvas.delete('image'+str(n));del self.images[n]
-        missing=visible-set(self.images)
+        self.tiles.update(visible)
+        missing={n for n in visible-set(self.images) if not self.tiles.large(n)}
         for n in sorted(missing):
             key=(n,self.zoom,self.rotations.get(str(n),0))
             if key not in self._bitmap_cache:continue
@@ -179,7 +185,7 @@ class PagePreview(ttk.Frame):
             self.images[n]=photo
             self.selection.pages[n]=dict(x=8,y=self.pages[n][0],w=photo.width(),h=photo.height(),chars=chars,rotation=key[2])
             self.canvas.create_image(8,self.pages[n][0],image=photo,anchor='nw',tags=('image'+str(n),))
-        missing=visible-set(self.images)
+        missing={n for n in visible-set(self.images) if not self.tiles.large(n)}
         for n in sorted(missing,key=lambda n:abs(self.pages[n][0]-top)):
             token=(self._epoch,n)
             if token not in self._requested:
@@ -258,6 +264,8 @@ class PagePreview(ttk.Frame):
                         self._quick_requested=True;self.renderer.locate(self._generation,self.quick_values)
                 else:self.page_text.set('Пустой PDF')
             elif result['op']=='locate':self.quick_anchors=result['anchors']
+            elif result['op']=='overview':self.tiles.overview(result)
+            elif result['op']=='tile' and result['epoch']==self._epoch:self.tiles.receive(result)
             elif result['op']=='page' and result['epoch']==self._epoch:
                 n=result['page'];self._requested.discard((self._epoch,n));key=(n,result['zoom'],result['rotation'])
                 image=Image.frombytes('RGB',result['size'],result['rgb']);photo=ImageTk.PhotoImage(image,master=self.canvas);image.close()
