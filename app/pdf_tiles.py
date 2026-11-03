@@ -5,14 +5,14 @@ from PIL import Image,ImageTk
 class Tiles:
     def __init__(self,view):
         self.v=view;self.cache=OrderedDict();self.bytes=0;self.signature=None;self.visible={};self.pending=set();self.serial=0
-        self.overviews=OrderedDict();self.overview_pending=set();self.backdrops={};self.text_pending=set()
+        self.overviews=OrderedDict();self.overview_pending=set();self.backdrops={};self.text_pending=set();self.backdrop_keys={}
     def reset(self,content=False):
         if self.v.canvas.winfo_exists():self.v.canvas.delete('pdf-tile');self.v.canvas.delete('pdf-overview')
-        self.visible.clear();self.backdrops.clear();self.signature=None;self.pending.clear();self.text_pending.clear()
+        self.visible.clear();self.backdrops.clear();self.backdrop_keys.clear();self.signature=None;self.pending.clear();self.text_pending.clear()
         if content:self.cache.clear();self.bytes=0;self.overviews.clear();self.overview_pending.clear()
     def large(self,n):return self.v.pages[n][1]*self.v.pages[n][2]>3_000_000
     def update(self,pages):
-        v=self.v;c=v.canvas;wanted=[]
+        v=self.v;c=v.canvas;wanted=[];prefetch=[]
         left=max(0,int(c.canvasx(0)-8));right=left+max(1,c.winfo_width())
         top=c.canvasy(0);bottom=top+max(1,c.winfo_height())
         for n in pages:
@@ -26,16 +26,23 @@ class Tiles:
                 v.renderer.jobs.put(dict(op='page',generation=v._generation,epoch=v._epoch,page=n,zoom=z,rotation=okey[1],overview=True,text=False))
             if okey in self.overviews and b>a:
                 im=self.overviews[okey];x0=min(w,left);x1=min(w,right)
-                if x1>x0:
+                backdrop_key=(x0,x1,a,b,w,h,okey)
+                if x1>x0 and self.backdrop_keys.get(n)!=backdrop_key:
+                    self.backdrop_keys[n]=backdrop_key
                     crop=im.crop((x0/w*im.width,a/h*im.height,x1/w*im.width,b/h*im.height)).resize((x1-x0,b-a),Image.Resampling.BILINEAR)
                     photo=ImageTk.PhotoImage(crop,master=c);c.delete('overview'+str(n))
                     item=c.create_image(8+x0,y+a,image=photo,anchor='nw',tags=('pdf-overview','overview'+str(n)))
                     c.tag_lower(item);c.tag_raise(item,v.pages[n][3]);self.backdrops[n]=photo
             for ty in range(a//512*512,b,512):
                 for tx in range(left//512*512,min(w,right+1),512):wanted.append((n,v.zoom,v.rotations.get(str(n),0),tx,ty,min(tx+512,w),min(ty+512,h)))
+            for ty in range(max(0,a//512*512-512),min(h,b+512),512):
+                for tx in range(max(0,left//512*512-512),min(w,right+512),512):
+                    key=(n,v.zoom,v.rotations.get(str(n),0),tx,ty,min(tx+512,w),min(ty+512,h))
+                    if key not in wanted:prefetch.append(key)
+        wanted+=prefetch
         signature=tuple(wanted)
         if signature!=self.signature:
-            self.signature=signature;self.serial+=1;v.renderer.set_viewport(self.serial,pages);self.pending.clear();self.text_pending.clear()
+            self.signature=signature;self.serial+=1;self.pending=v.renderer.set_viewport(self.serial,pages,set(wanted));self.text_pending.clear()
             self.overview_pending={k for k in self.overview_pending if k[0] in pages}
         keep=set(wanted)
         for key,item in list(self.visible.items()):
@@ -59,14 +66,15 @@ class Tiles:
         self.visible[key]=(item,photo)
     def receive(self,result):
         v=self.v
-        if result['viewport']!=self.serial:return
         n=result['page'];key=(n,result['zoom'],result['rotation'],*result['tile']);self.pending.discard(key)
         im=Image.frombytes('RGB',result['size'],result['rgb']);photo=ImageTk.PhotoImage(im,master=v.canvas);im.close()
         if key not in self.cache:self.bytes+=photo.width()*photo.height()*4
         self.cache[key]=photo;self.cache.move_to_end(key)
         while self.bytes>48*1024*1024 and self.cache:
             _,old=self.cache.popitem(last=False);self.bytes-=old.width()*old.height()*4
-        if key not in self.visible:self.draw(key,photo)
+        if key in (self.signature or ()) and key not in self.visible:self.draw(key,photo)
+        if self.signature and all(k in self.visible for k in self.signature):
+            v.canvas.delete('pdf-transition');v._transition=[]
         chars=result['chars'] or v._text_cache.get((n,key[2]),[])
         v._text_cache[(n,key[2])]=chars
         y,w,h,_=v.pages[n];v.selection.pages[n]=dict(x=8,y=y,w=w,h=h,chars=chars,rotation=key[2])

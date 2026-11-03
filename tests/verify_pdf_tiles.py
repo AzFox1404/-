@@ -17,7 +17,8 @@ with tempfile.TemporaryDirectory() as td:
  for y in range(10,3300,30):page.draw_line((10,y),(2300,y));page.insert_text((30,y+15),'SCHEME 0123456789',fontsize=10)
  doc.save(f);doc.close();before=f.read_bytes()
  root=tk.Tk();app=studio.Studio(root);top=tk.Toplevel(root);top.geometry('850x650');v=PagePreview(top,app);v.pack(fill='both',expand=True);errors=[];root.report_callback_exception=lambda *e:errors.append(str(e[1]))
- v.show(f,0);wait(root,lambda:bool(v.tiles.visible) and bool(v.tiles.overviews))
+ started=time.monotonic();v.show(f,0);wait(root,lambda:bool(v.tiles.visible) and bool(v.tiles.overviews))
+ print('METRIC generated A0 first visible ms:',round((time.monotonic()-started)*1000),flush=True)
  assert not v.images and v.tiles.bytes<48*1024*1024
  for photo in v.tiles.cache.values():assert photo.width()<=513 and photo.height()<=513
  pid=v.renderer.process.pid
@@ -34,5 +35,12 @@ with tempfile.TemporaryDirectory() as td:
   v.canvas.yview_moveto(.6);v.render_visible();wait(root,lambda:bool(v.tiles.visible) and not v.tiles.pending)
   assert v.tiles.bytes<=48*1024*1024
  assert v.renderer.process.pid==pid and f.read_bytes()==before
+ old=dict(v.tiles.visible);v.canvas.yview_scroll(1,'units');v.render_visible()
+ shared=set(old)&set(v.tiles.visible)
+ assert shared and all(old[k][1] is v.tiles.visible[k][1] for k in shared),'pan must preserve exact bitmap objects'
+ wait(root,lambda:not v.tiles.pending)
+ v.set_zoom(135)
+ assert v.canvas.find_withtag('pdf-transition'),'zoom must retain a visible previous frame'
+ wait(root,lambda:bool(v.tiles.visible) and not v.tiles.pending)
  top.destroy();root.update();assert not errors,errors
  app.close();print('PASS A0 visible-only tiles, bounded bitmap memory, cached overview, canonical text geometry, four rotations, scroll and cleanup; same worker and unchanged PDF')

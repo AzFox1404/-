@@ -75,12 +75,8 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         self.filters={};self.search_history={};self.search_redo={};self.saved_rev={};self.history={};self.redo={};self.replaying=False;self.targets={};self.selected={};self.buttons=[]
         self.saved_text=STORE/'Библиотека'/'Исключения.json'
         self.variants=json.loads(self.saved_text.read_text('utf-8')) if self.saved_text.exists() else {}
-        seed=SAMPLES.parent/'Шаблоны'
-        if seed.is_dir():
-            for p in docs(seed):
-                dest=LIB/'ИД здание 1 - 18х48'/p.relative_to(seed)
-                if not dest.exists():
-                    dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,dest)
+        from template_library import organize
+        organize(LIB,SAMPLES.parent/'Шаблоны')
         root.title('Бюро ИД · Проекты');root.geometry('1380x820');root.configure(bg=BG)
         self.ui_init(STORE);self.row_choice={}
         self.home()
@@ -375,7 +371,8 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         title=ask_text(self,'Шаблон','Название шаблона',s.copy.stem)
         if not title:return
         if any(c in title for c in '<>:"/\\|?*') or title in ('.','..'):messagebox.showerror('Шаблон','Недопустимое имя');return
-        dest=LIB/self.project.name/(title+s.copy.suffix)
+        from template_library import category
+        dest=LIB/category(title+' '+s.copy.stem)/(title+s.copy.suffix)
         dest.parent.mkdir(exist_ok=True);dest=next_path(dest)
         def finish():
             if not s.thread.is_alive():

@@ -6,6 +6,7 @@
 |---|---|---|
 | Запуск | `Бюро ИД.cmd`, `app/workspace_preview.py` (`__main__`) | `studio.Studio`, `app/app_paths.py` |
 | Главная, проекты, библиотека, дерево | `app/studio.py` | `app/project_analysis.py`, `app/folder_operations.py` |
+| Категории шаблонов и перенос старой библиотеки | `app/template_library.py` | `studio.__init__`, `studio.keep_template` |
 | Панель задач при fullscreen | `app/taskbar_reveal.py` | нижняя зона 24px; маска окна, без изменения настроек Windows |
 | Темы, иконки, подсказки, ленты | `app/ui_tools.py`, `app/command_icons.py`, `app/hints.py` | `app/app_dialogs.py`, `app/windows_integration.py` |
 | Панели: отделить, скрыть, вернуть | `app/workspace_preview.py` (`pane_header`, `collapse_panel`, `restore_panel`) | `studio.build`, `app/save_decisions.py` |

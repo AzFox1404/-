@@ -12,7 +12,11 @@ def run():
    if req['op']=='open':
     if doc:doc.close()
     lists.clear();texts.clear()
-    source=req['source'];doc=fitz.open(stream=source,filetype='pdf') if isinstance(source,bytes) else fitz.open(source)
+    source=req['source']
+    if not isinstance(source,bytes):
+     from pathlib import Path
+     source=Path(source).read_bytes()
+    doc=fitz.open(stream=source,filetype='pdf')
     result=dict(op='open',generation=req['generation'],sizes=[tuple(doc[n].rect)[2:] for n in range(len(doc))])
    elif req['op']=='locate':
     from fast_preview import locate

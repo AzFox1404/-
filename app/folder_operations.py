@@ -72,6 +72,11 @@ class FolderOperations:
         old_current=self.current.source if self.current and self.current in affected else None
         def apply():
             try:
+                reference=getattr(self,'reference_path',None)
+                if reference and (reference==source or reference.is_relative_to(source)) and operation in ('delete','move'):
+                    self.reference_path=None
+                    view=getattr(self,'reference_view',None)
+                    if view is not None and view.winfo_exists():view.destroy()
                 if operation=='copy':
                     if source.is_dir():shutil.copytree(source,target)
                     else:shutil.copy2(source,target)
@@ -89,6 +94,8 @@ class FolderOperations:
                     if source.is_dir():shutil.rmtree(source)
                     else:source.unlink()
                     self.update_path_links(source);self.journal().removed.add(source)
+                    from recovery_state import persist
+                    persist(self.journal())
                 if old_current and operation=='delete':self.current=None
                 self.selected[0]=str(target or source.parent);self.expanded[0].add(str((target or source.parent).parent.resolve()))
                 self.refresh_documents()

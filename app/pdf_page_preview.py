@@ -143,6 +143,12 @@ class PagePreview(ttk.Frame):
         if self.path is None:return
         if self._sizes is None:return
         self._epoch+=1;self.renderer.epoch=self._epoch;self._requested.clear()
+        previous=[(k,photo) for k,(_,photo) in self.tiles.visible.items()]
+        for n,photo in self.images.items():
+            rotation=self.rotations.get(str(n),0)
+            if self.selection.pages.get(n,{}).get('rotation')==rotation:
+                original_width=self._sizes[n][1] if rotation%180 else self._sizes[n][0]
+                previous.append(((n,photo.width()/original_width*75,rotation,0,0,photo.width(),photo.height()),photo))
         self.number=max(0,min(len(self._sizes)-1,self.number));self.pages=[];self.starts=[];y=8;max_width=0
         self.canvas.delete('all');self.images.clear()
         self.tiles.reset()
@@ -152,6 +158,16 @@ class PagePreview(ttk.Frame):
             slot=self.canvas.create_rectangle(8,y,w+8,y+h,fill='white',outline='#aaa')
             self.pages.append((y,w,h,slot));self.starts.append(y);y+=h+16;max_width=max(max_width,w)
         self.height=y;self.canvas.configure(scrollregion=(0,0,max_width+16,y))
+        self._transition=[];budget=16*1024*1024
+        for key,photo in previous:
+            n,z,r,x0,y0,x1,y1=key
+            if r!=self.rotations.get(str(n),0):continue
+            factor=self.zoom/z;w=max(1,round(photo.width()*factor));h=max(1,round(photo.height()*factor))
+            if w*h*4>budget:continue
+            budget-=w*h*4
+            im=ImageTk.getimage(photo).resize((w,h),Image.Resampling.BILINEAR)
+            frame=ImageTk.PhotoImage(im,master=self.canvas);self._transition.append(frame)
+            self.canvas.create_image(8+round(x0*factor),self.pages[n][0]+round(y0*factor),image=frame,anchor='nw',tags=('pdf-transition',))
         # Keep completed OCR as well as native text when changing scale/rotation.
         for n,data in (self.selection.pages.items() if self.selection.source==self.path else ()):
             if data['chars']:
@@ -275,5 +291,6 @@ class PagePreview(ttk.Frame):
                     _,(old,_)=self._bitmap_cache.popitem(last=False);self._bitmap_bytes-=old.width()*old.height()*4
                 self.images[n]=photo;self.selection.pages[n]=dict(x=8,y=self.pages[n][0],w=photo.width(),h=photo.height(),chars=chars,rotation=key[2])
                 self.canvas.delete('image'+str(n));self.canvas.create_image(8,self.pages[n][0],image=photo,anchor='nw',tags=('image'+str(n),))
+                self.canvas.delete('pdf-transition');self._transition=[]
                 self.render_visible()
         if self.winfo_exists():self._render_poll=self.after(16,self.poll_renderer)
