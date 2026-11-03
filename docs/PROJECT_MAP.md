@@ -9,6 +9,7 @@
 | Категории шаблонов и перенос старой библиотеки | `app/template_library.py` | `studio.__init__`, `studio.keep_template` |
 | Панель задач при fullscreen | `app/taskbar_reveal.py` | нижняя зона 24px; маска окна, без изменения настроек Windows |
 | Темы, иконки, подсказки, ленты | `app/ui_tools.py`, `app/command_icons.py`, `app/hints.py` | `app/app_dialogs.py`, `app/windows_integration.py` |
+| Заголовки окон в теме приложения | `app/window_caption.py` | native resize/move и taskbar сохранены; `windows_integration.theme_caption` |
 | Панели: отделить, скрыть, вернуть | `app/workspace_preview.py` (`pane_header`, `collapse_panel`, `restore_panel`) | `studio.build`, `app/save_decisions.py` |
 | Перетягивание стеклянных панелей | `app/glass_resize.py` | `tests/verify_home_drag_release.py`, `tests/verify_glass_resize.py` |
 | Поля ввода/выбор строки | `app/studio.py` (`visible_fields`, `queue_register_operation`) | `app/office_forms.py`, `app/act_layout.py` |

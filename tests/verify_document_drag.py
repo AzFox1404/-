@@ -24,6 +24,14 @@ with tempfile.TemporaryDirectory() as td:
  for event in ('<Escape>','<FocusOut>','<Unmap>'):
   ghost=drag();tree.event_generate(event);root.update();assert not ghost.winfo_exists()
  assert len(calls)==1 and source.read_text()=='original'
+ ghost=drag();tree.event_generate('<ButtonRelease-1>',x=-30,y=y);root.update()
+ assert not ghost.winfo_exists() and len(calls)==1
+ inner=dest/'inner';inner.mkdir();child=tree.insert('','end',text='inner',values=(str(inner),));root.update()
+ by=tree.bbox(b)[1]+8;cy=tree.bbox(child)[1]+8
+ tree.event_generate('<ButtonPress-1>',x=10,y=by)
+ tree.event_generate('<B1-Motion>',x=60,y=by)
+ tree.event_generate('<ButtonRelease-1>',x=10,y=cy);root.update()
+ assert len(calls)==1,'folder inside itself must silently cancel'
  app.toggle_theme(1);root.update();assert root.caption_theme['dark'] and root.caption_theme['dark_mode']
  app.toggle_theme(0);root.update();assert not root.caption_theme['dark']
  ghost=drag();tree.destroy();root.update();assert not ghost.winfo_exists()

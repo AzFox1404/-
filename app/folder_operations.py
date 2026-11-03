@@ -64,8 +64,7 @@ class FolderOperations:
             source=self.project_path(source)
             if target is not None:
                 target=self.project_path(target,True)
-                if target.exists():raise ValueError('Файл или папка с таким названием уже существует.')
-                if target.is_relative_to(source):raise ValueError('Нельзя переместить папку внутрь неё самой.')
+                if target.exists() or target.is_relative_to(source):return
             self.protect_folder(source)
         except (OSError,ValueError) as e:messagebox.showerror('Документы',str(e));return
         affected=[s for s in self.sessions.values() if s.source==source or s.source.is_relative_to(source)]
@@ -122,7 +121,7 @@ class FolderOperations:
         from studio import next_path
         try:
             parent=self.selected_directory()
-            if parent==source or parent.is_relative_to(source):raise ValueError('Выберите другую папку для вставки.')
+            if parent==source or parent.is_relative_to(source) or cut and parent==source.parent:return
             dest=next_path(parent/source.name)
             self.perform_file_operation(source,'move' if cut else 'copy',dest)
             if cut:self.path_clipboard=None
@@ -164,11 +163,13 @@ class FolderOperations:
             if not state[0]:return
             source,x,y=state[0];clear()
             if abs(event.x_root-x)+abs(event.y_root-y)<9:return
+            if not (0<=event.x<tree.winfo_width() and 0<=event.y<tree.winfo_height()):return
             row=tree.identify_row(event.y)
             values=tree.item(row,'values') if row else ()
             if not values:return
             parent=Path(values[0]);parent=parent if parent.is_dir() else parent.parent
-            if parent==source.parent:return
+            if parent==source.parent or parent==source or parent.is_relative_to(source):return
+            if (parent/source.name).exists():return
             self.perform_file_operation(source,'move',parent/source.name)
         tree.bind('<ButtonPress-1>',press,add='+');tree.bind('<ButtonRelease-1>',release,add='+')
         tree.bind('<B1-Motion>',motion,add='+')

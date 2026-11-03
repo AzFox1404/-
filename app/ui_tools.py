@@ -82,6 +82,26 @@ class Interface:
             st.map(name,fieldbackground=[('readonly',entry_bg),('!disabled',entry_bg)],foreground=[('!disabled',LIGHT['text'])])
         self.root.option_add('*TCombobox*Listbox.background',LIGHT['paper'])
         self.root.option_add('*TCombobox*Listbox.foreground',LIGHT['text'])
+        self.root.option_add('*TCombobox*Listbox.font',('Times New Roman',11))
+        field=('Dark' if self.dark else 'Light')+'Form.field'
+        arrow=('Dark' if self.dark else 'Light')+'Form.arrow'
+        entry_bg='#d3d1d0' if self.dark else LIGHT['paper']
+        if field not in st.element_names():
+            images=[]
+            for border in (c['line'],c['accent']):
+                im=Image.new('RGB',(20,24),c['paper']);draw=ImageDraw.Draw(im)
+                draw.rounded_rectangle((0,0,19,23),radius=5,fill=entry_bg,outline=border)
+                images.append(ImageTk.PhotoImage(im,master=self.root))
+            self.theme_images[field]=images;st.element_create(field,'image',images[0],('focus',images[1]),border=5,sticky='nsew')
+            im=Image.new('RGB',(18,20),entry_bg);ImageDraw.Draw(im).polygon(((5,8),(13,8),(9,12)),fill=LIGHT['text'])
+            photo=ImageTk.PhotoImage(im,master=self.root);self.theme_images[arrow]=[photo];st.element_create(arrow,'image',photo,sticky='')
+        for kind in ('Entry','Combobox'):
+            children=[]
+            if kind=='Combobox':children.append((arrow,{'side':'right','sticky':'ns'}))
+            children.append((kind+'.padding',{'sticky':'nsew','children':[(kind+'.textarea',{'sticky':'nsew'})]}))
+            st.layout('Form.T'+kind,[(field,{'sticky':'nsew','children':children})])
+            st.configure('Form.T'+kind,font=('Times New Roman',11),padding=(6,3),fieldbackground=entry_bg,foreground=LIGHT['text'],insertcolor=LIGHT['text'])
+            st.map('Form.T'+kind,fieldbackground=[('readonly',entry_bg)],foreground=[('!disabled',LIGHT['text'])])
         st.map('TButton',background=[('active',c['hover'])],foreground=[('disabled',c['muted'])])
         for name in ('TCheckbutton','TRadiobutton'):
             st.map(name,background=[('active',c['bg']),('!disabled',c['bg'])],
@@ -127,6 +147,7 @@ class Interface:
                 from windows_integration import theme_caption
                 theme_caption(w,c,self.dark)
             if isinstance(w,(ttk.Entry,ttk.Combobox)):
+                w.configure(style='Form.TCombobox' if isinstance(w,ttk.Combobox) else 'Form.TEntry',font=('Times New Roman',11))
                 from clipboard_keys import install as clipboard_install
                 clipboard_install(w)
                 from drag_selection import install

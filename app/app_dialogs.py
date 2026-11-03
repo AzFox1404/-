@@ -9,9 +9,12 @@ def configure(app):
     global _app
     _app = weakref.ref(app)
 
-def place_window(app,win):
+def place_window(app,win,settle=False):
     """Center new app windows; nested dialogs cascade toward ten o'clock."""
-    if not win.winfo_exists() or getattr(win,'_placed',False):return
+    if not win.winfo_exists() or getattr(win,'_placed',False) and not settle:return
+    if settle:
+        x,y=getattr(win,'_placement_position',(None,None))
+        if (win.winfo_x(),win.winfo_y())!=(x,y):return
     root=app.root
     if not root.winfo_viewable():return
     def descendants(parent):
@@ -20,11 +23,14 @@ def place_window(app,win):
             yield from descendants(child)
     floating=set(getattr(app,'windows',{}).values())
     depth=sum(1 for w in descendants(root) if w is not win and w not in floating and w.winfo_viewable() and not w.overrideredirect())
+    if settle:depth=getattr(win,'_placement_depth',depth)
     width=max(win.winfo_width(),win.winfo_reqwidth());height=max(win.winfo_height(),win.winfo_reqheight())
-    if hasattr(win,'_placement_size'):width,height=win._placement_size
+    if hasattr(win,'_placement_size') and not settle:width,height=win._placement_size
     x=root.winfo_rootx()+(root.winfo_width()-width)//2-depth*24
     y=root.winfo_rooty()+(root.winfo_height()-height)//2-depth*16
-    win._placed=True;win.geometry(f'{width}x{height}{x:+d}{y:+d}')
+    win._placed=True;win.geometry(f'{x:+d}{y:+d}' if settle else f'{width}x{height}{x:+d}{y:+d}')
+    win._placement_position=(x,y);win._placement_depth=depth
+    if not settle:win.after(50,lambda:place_window(app,win,True))
 
 def action(app,parent,text,key,command):
     button=ttk.Button(parent,text=text,image=app.icon(key),compound='left',
