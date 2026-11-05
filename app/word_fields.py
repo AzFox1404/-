@@ -84,7 +84,8 @@ def analyze_word(path,prepared=None):
     if kind=='unknown' and re.search(r'\bприказ\b',low) and 'приказываю' in low:kind='order'
     def add(key,label,parts,typ='text'):
         nonlocal counter
-        parts=[(i,a,b) for i,a,b in parts if (i,a,b) not in claimed and not calculated(paras[i])]
+        parts=[(i,a,b) for i,a,b in parts if not calculated(paras[i]) and not any(
+            j==i and (a<y and b>x or a==b==x==y) for j,x,y in claimed)]
         if any(texts[i][a:b].strip() for i,a,b in parts):parts=[(i,a,b) for i,a,b in parts if texts[i][a:b].strip()]
         elif len(parts)>1:parts=parts[:1]
         if not parts:return

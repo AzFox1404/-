@@ -60,7 +60,10 @@ def dialog(app):
   from word_fields import prepare_word
   plan=prepare_word(session.copy,session.preview_dir/'manual-inspect')
   doc=Document(session.copy if session.copy.suffix.lower()=='.docx' else Path(plan['prepared']).with_name('converted.docx'));ps=doc._element.body.xpath('.//w:p');win=tk.Toplevel(app.root);win.title('Дополнительное поле Word');win.geometry('850x540');win.grab_set()
-  ttk.Label(win,text='Автоматические правила сохраняются. Выберите текст значения и выделите точные символы. Пустые места и постоянные подписи не предлагаются.',wraplength=800,padding=10).pack(fill='x')
+  bound_paragraphs=Document(plan['prepared'])._element.body.xpath('.//w:p')
+  def overlaps(i,a,b):
+   return existing_overlap(ps[i],a,b,session.spec) or existing_overlap(bound_paragraphs[i],a,b,plan['fields'])
+  ttk.Label(win,text='Автоматические правила сохраняются. Выберите текст значения и выделите точные символы. Сравнение с заполненной формой подсказывает области для проверки.',wraplength=800,padding=10).pack(fill='x')
   candidates=[]
   from sample_forms import suggestions_word
   suggestions=suggestions_word(doc)
@@ -81,21 +84,41 @@ def dialog(app):
    if lb.curselection():
     i=candidates[lb.curselection()[0]];area.delete('1.0','end');area.insert('1.0',text(ps[i]))
     proposal=suggestions.get(i);label.set(proposal['label'] if proposal else '')
+    if i in compared:
+     a,b=compared[i];area.tag_add('sel',f'1.0+{a}c',f'1.0+{b}c')
+  compared={}
+  def compare():
+   from tkinter import filedialog
+   from form_comparison import word_candidates
+   path=filedialog.askopenfilename(parent=win,title='Заполненный экземпляр формы',filetypes=[('Word','*.docx')])
+   if not path:return
+   try:found=word_candidates(doc,Document(path))
+   except Exception as exc:messagebox.showerror('Сравнение форм',str(exc));return
+   compared.clear()
+   for i,(a,b) in found.items():
+    if overlaps(i,a,b):continue
+    compared[i]=(a,b)
+    if i not in candidates:
+     candidates.append(i);lb.insert('end','')
+    index=candidates.index(i);lb.delete(index)
+    lb.insert(index,'После сравнения · '+(text(ps[i]).strip() or f'Пустая область после «{text(ps[i-1]).strip()[:80] if i else ""}»'))
+   if not compared:messagebox.showinfo('Сравнение форм','Дополнительные области ввода не найдены.')
+  ttk.Button(win,text='Сравнить с заполненным DOCX',command=compare).pack(anchor='w',padx=10)
   lb.bind('<<ListboxSelect>>',select)
-  empty=tk.BooleanVar();ttk.Checkbutton(win,text='Подтверждаю: выбранная пустая подчёркнутая строка предназначена для заполнения',variable=empty).pack(anchor='w',padx=10)
+  empty=tk.BooleanVar();ttk.Checkbutton(win,text='Подтверждаю: выбранная пустая область предназначена для заполнения',variable=empty).pack(anchor='w',padx=10)
   label=tk.StringVar();ttk.Label(win,text='Название нового поля').pack(anchor='w',padx=10);ttk.Entry(win,textvariable=label).pack(fill='x',padx=10)
   def save():
    if not lb.curselection() or not label.get().strip():return
    i=candidates[lb.curselection()[0]]
    if not text(ps[i]).strip():
-    if not empty.get():messagebox.showinfo('Привязка','Подтвердите назначение пустой подчёркнутой строки.');return
-    a=b=len(text(ps[i]))
+    if not empty.get():messagebox.showinfo('Привязка','Подтвердите назначение пустой области.');return
+    a,b=compared.get(i,(len(text(ps[i])),)*2)
    else:
     try:a=len(area.get('1.0','sel.first'));b=len(area.get('1.0','sel.last'))
     except tk.TclError:messagebox.showinfo('Привязка','Выделите только заменяемое значение.');return
    i=candidates[lb.curselection()[0]]
    if area.get('1.0','end-1c')!=text(ps[i]):messagebox.showerror('Привязка','Текст образца нельзя изменять в этом окне. Выделите диапазон заново.');return
-   if existing_overlap(ps[i],a,b,session.spec):messagebox.showerror('Привязка','Это значение уже связано с существующим полем. Действующая привязка сохранена.');return
+   if overlaps(i,a,b):messagebox.showerror('Привязка','Это значение уже связано с существующим полем. Действующая привязка сохранена.');return
    if re.match(r'^(Подпись|Представитель|Лицо,|Застройщик|АКТ|РЕЕСТР)',text(ps[i])[a:b].strip(),re.I):messagebox.showerror('Привязка','Выбрана постоянная подпись, а не значение.');return
    if not messagebox.askyesno('Подтверждение привязки',f'Создать поле «{label.get()}» для:\n'+text(ps[i])[a:b]+'\n\nПравило будет применяться только к формам с совпадающей структурой и постоянными подписями.'):return
    data=rules();data.setdefault(signature(doc),[]).append(dict(paragraph=i,start=a,end=b,label=label.get().strip()));FILE.parent.mkdir(parents=True,exist_ok=True);tmp=FILE.with_suffix('.tmp');tmp.write_text(json.dumps(data,ensure_ascii=False,indent=2),'utf-8');tmp.replace(FILE)

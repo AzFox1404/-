@@ -51,13 +51,28 @@ def dialog(app):
     continue
    if c.coordinate in {v['dest'] for v in session.spec.values()} or c.data_type=='f' or instruction(c.value) or re.match(r'^(Подпись|Представитель|АКТ|РЕЕСТР)',str(c.value),re.I):continue
    choices.append(c.coordinate+' — '+str(c.value)[:100])
- ttk.Label(win,text='Выберите ячейку со значением. Формулы, пустые места и пояснения не предлагаются.',wraplength=580,padding=12).pack(fill='x')
+ ttk.Label(win,text='Выберите ячейку со значением. Сравнение с заполненной формой подсказывает пустые области для проверки.',wraplength=580,padding=12).pack(fill='x')
  lb=tk.Listbox(win,exportselection=False);lb.pack(fill='both',expand=True,padx=12)
  for choice in choices:
   cell=choice.split(' — ')[0];lb.insert('end',choice+(' · Образец: '+suggestions[cell] if cell in suggestions else ''))
  label=tk.StringVar();ttk.Entry(win,textvariable=label).pack(fill='x',padx=12,pady=6)
  def propose(e):
   if lb.curselection():label.set(suggestions.get(choices[lb.curselection()[0]].split(' — ')[0],''))
+ def compare():
+  from tkinter import filedialog
+  from form_comparison import excel_candidates
+  path=filedialog.askopenfilename(parent=win,title='Заполненный экземпляр формы',filetypes=[('Excel','*.xlsx')])
+  if not path:return
+  try:
+   sample=load_workbook(path)
+   try:found=excel_candidates(s,sample.worksheets[0])
+   finally:sample.close()
+  except Exception as exc:messagebox.showerror('Сравнение форм',str(exc));return
+  known={choice.split(' — ')[0] for choice in choices}|{v['dest'] for v in session.spec.values()}
+  for cell in sorted(found-known,key=lambda name:(s[name].row,s[name].column)):
+   choices.append(cell+' — Пустая область найдена сравнением');lb.insert('end',choices[-1])
+  if not found-known:messagebox.showinfo('Сравнение форм','Дополнительные области ввода не найдены.')
+ ttk.Button(win,text='Сравнить с заполненным XLSX',command=compare).pack(anchor='w',padx=12)
  lb.bind('<<ListboxSelect>>',propose)
  def save():
   if not lb.curselection() or not label.get().strip():return

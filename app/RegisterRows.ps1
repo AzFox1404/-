@@ -140,13 +140,21 @@ function EditRegisterSection([int]$start,[bool]$delete,[string]$title){
   if($headers.Count -lt 2){throw 'Нельзя удалить последний раздел.'}
   [void]$sheet.Rows.Item("${start}:${end}").Delete();$selected=$start
  }else{
-  if(!$title.Trim()){throw 'Введите название раздела.'}
+  $title=$title.Trim()
+  if(!$title){throw 'Введите название раздела.'}
   if($title -match '^(АОСР|АООК|Акты|Исполнительные схемы|Паспорта|Сертификаты|Приложения|Передал|Принял)'){throw 'Это название обозначает группу документов или подпись. Введите название раздела.'}
   $at=$end+1;$length=$end-$start+1;$last=$at+$length-1
   [void]$sheet.Rows.Item("${at}:${last}").Insert()
   [void]$sheet.Rows.Item("${start}:${end}").Copy($sheet.Rows.Item("${at}:${last}"))
   $sheet.Cells.Item($at,1).Value2=$title
-  foreach($r in $rows){if($r -gt $start -and $r -le $end){$dest=$at+$r-$start;for($c=2;$c -le 6;$c++){[void]$sheet.Cells.Item($dest,$c).ClearContents()}}}
+  foreach($r in $rows){
+   if($r -le $start -or $r -gt $end){continue}
+   $dest=$at+$r-$start
+   for($c=2;$c -le $layout.lastcol;$c++){
+    $cell=$sheet.Cells.Item($dest,$c)
+    if(!$cell.HasFormula){[void]$cell.ClearContents()}
+   }
+  }
   $selected=$at+1
  }
  RepairRegisterNumbers $sheet 0 $mode;SetupRegisterPrint $sheet

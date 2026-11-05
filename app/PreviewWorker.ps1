@@ -123,9 +123,15 @@ try{
      $entry=$special[$k]
      if($excel){
       $cell=$sheet.Range([string]$entry.dest)
+      if($k -match '^row\d+_'){$v=$v.Trim()}
       if($entry.kind -eq 'datecell' -and $v){$day=[datetime]::ParseExact($v,'dd.MM.yyyy',[Globalization.CultureInfo]::InvariantCulture);$cell.GetType().InvokeMember("Value2",[Reflection.BindingFlags]::SetProperty,$null,$cell,@($day.ToOADate()))|Out-Null}
       elseif($entry.kind -eq 'number' -and $v){$cell.GetType().InvokeMember("Value2",[Reflection.BindingFlags]::SetProperty,$null,$cell,@([double]::Parse($v)))|Out-Null}
       elseif($entry.label -eq 'Страницы' -and $v -match '^\d+-\d+$'){$cell.Value2="'"+$v} else{$cell.Value2=[string]$entry.prefix+$v}
+      if($k -match '^row\d+_' -and $cell.WrapText -and !$cell.MergeCells){
+       $height=[double]$cell.RowHeight
+       [void]$cell.EntireRow.AutoFit()
+       if($cell.RowHeight -lt $height){$cell.RowHeight=$height}
+      }
      }elseif($entry.word){
       $display=$v
       if($k -in 'materials','attachments','schemes','project','hiddenWorks'){$display=[regex]::Replace($display,'(\b\d{2}\.\d{2}\.\d{4})(?!\d)(?!\s*г\.?)','$1 г.')}
