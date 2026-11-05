@@ -72,7 +72,11 @@ def install(root):
         # Aero Peek/taskbar thumbnails may promote Explorer above fullscreen.
         # Keep the real taskbar immediately below our window while this app is
         # active; clipping then reveals it smoothly and covering always hides it.
-        if foreground in (hwnd,bar) or our_window(foreground):
+        if foreground==bar:
+            # Explorer is handling a click or preview. Keep the opening while
+            # it transfers activation, and leave its z-order alone.
+            animate(max(0,rect.bottom-bar_rect.top) if inside else 0)
+        elif foreground==hwnd or our_window(foreground):
             if inside:
                 if not state['layered'] or u.GetWindowLongPtrW(bar,-20)&8:
                     u.SetWindowPos(bar,C.c_void_p(-2),0,0,0,0,0x13)

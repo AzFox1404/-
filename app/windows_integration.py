@@ -50,7 +50,12 @@ def cover_monitor(window,bounds):
     put=u.SetWindowLongPtrW;put.argtypes=[W.HWND,C.c_int,C.c_ssize_t];put.restype=C.c_ssize_t
     put(hwnd,-16,get(hwnd,-16)&~(0x00c00000|0x00040000))
     u.SetWindowPos.argtypes=[W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT]
-    u.SetWindowPos(hwnd,None,*bounds,0x0034)
+    # A fullscreen wrapper can inherit the topmost band from a native
+    # transition. Keep it in the same band as normal taskbar windows.
+    if get(hwnd,-20)&8:
+        u.SetWindowPos(hwnd,C.c_void_p(-2),*bounds,0x0030)
+    else:
+        u.SetWindowPos(hwnd,None,*bounds,0x0034)
 
 def close_only(window):
     """Keep resizing and the native close action, hide caption min/max boxes."""

@@ -49,6 +49,20 @@ with tempfile.TemporaryDirectory() as td:
         state['reset']();u.SetWindowPos(bar,C.c_void_p(-1),0,0,0,0,0x13)
         root.event_generate('<FocusIn>');pump(root)
         assert not u.GetWindowLongPtrW(bar,-20)&8 and state['height']==0
+        point[1]=r.bottom-10
+        u.GetForegroundWindow=lambda:bar
+        u.SetWindowPos(bar,C.c_void_p(-1),0,0,0,0,0x13)
+        positions.clear()
+        pump(root,.35)
+        assert bar not in positions,'leave Explorer stacking alone during a taskbar click'
+        u.GetForegroundWindow=lambda:u.FindWindowW('Progman',None)
+        pump(root,.2)
+        assert state['height']==0 and state['timer'] is None
+        u.GetForegroundWindow=lambda:hwnd
+        point[1]=r.top+100
+        root.event_generate('<FocusIn>');pump(root)
+        assert state['height']==0 and not u.GetWindowLongPtrW(bar,-20)&8
+        assert not u.GetWindowLongPtrW(hwnd,-20)&8
         # A modal has a different HWND but belongs to the same application.
         dialog=tk.Toplevel(root);dialog.transient(root);dialog.grab_set();pump(root)
         modal_hwnd=u.GetParent(dialog.winfo_id()) or dialog.winfo_id()
