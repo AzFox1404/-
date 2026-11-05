@@ -20,16 +20,19 @@ function NextSegment($text,$source,$width){
  $probe=$script:probeBook.Worksheets.Item(1).Range('A1')
  $probe.Font.Name=$source.Font.Name;$probe.Font.Size=$source.Font.Size
  $probe.Font.Bold=$source.Font.Bold;$probe.Font.Italic=$source.Font.Italic
+ $probe.WrapText=$false;$probe.ShrinkToFit=$false
+ $probe.Orientation=0;$probe.IndentLevel=0
  $words=[regex]::Matches($text,'\S+');if(!$words.Count){return ''}
  $lo=0;$hi=$words.Count
  while($lo -lt $hi){
   $mid=[int][math]::Ceiling(($lo+$hi)/2);$word=$words[$mid-1];$try=$text.Substring(0,$word.Index+$word.Length)
+  if($try.Length -gt 200){$hi=$mid-1;continue}
   $probe.NumberFormat='@';$probe.Value2=$try;[void]$probe.EntireColumn.AutoFit()
   if($probe.Width -le $width-2){$lo=$mid}else{$hi=$mid-1}
  }
  if(!$lo){
   # A long identifier cannot be split at a space; split by glyph only as a last resort.
-  $low=0;$high=$words[0].Length
+  $low=0;$high=[math]::Min(200,$words[0].Length)
   while($low -lt $high){$mid=[int][math]::Ceiling(($low+$high)/2);$probe.Value2=$text.Substring(0,$mid);[void]$probe.EntireColumn.AutoFit();if($probe.Width -le $width-2){$low=$mid}else{$high=$mid-1}}
   return $text.Substring(0,[math]::Max(1,$low))
  }
@@ -62,12 +65,15 @@ function SetActText($key,$value){
  for($n=0;($old=BoundCell (MoreName $key $n));$n++){
   $doc.Names.Item((MoreName $key $n)).Delete();[void]$old.EntireRow.Delete()
  }
- $text=$value.Trim()
+ $text=[regex]::Replace($value.Trim(),'[\r\n\t]+',' ')
  $source=$null
  for($i=0;$i -lt $bindings[$key].Count;$i++){
   $source=BoundCell (FieldName $key $i)
   if(!$source){$source=$sheet.Range($bindings[$key][$i])}
   if(!$source -or ([string]$source.Text).TrimStart().StartsWith('(') -and $source.Font.Size -le 9){throw "Нет безопасного поля для $key"}
+  $source.MergeArea.WrapText=$false;$source.MergeArea.ShrinkToFit=$false
+  $source.MergeArea.VerticalAlignment=-4107
+  $source.RowHeight=[math]::Max([double]$source.RowHeight,[double]$source.Font.Size*1.5+2)
   $part=NextSegment $text $source $source.MergeArea.Width
   $source.Font.Underline=-4142;$source.MergeArea.Borders.Item(9).LineStyle=1;$source.MergeArea.Borders.Item(9).Weight=2
   $source.Value2=$part;$text=$text.Substring($part.Length).TrimStart()

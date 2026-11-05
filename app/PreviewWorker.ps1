@@ -60,7 +60,7 @@ try{
   foreach($bm in $doc.Bookmarks){if($bm.Name -like 'ID_*'){$fields[$bm.Name]=$bm.Range.Text}}
  }
  $special=@{}
- if($FieldMap){$spec=Get-Content -LiteralPath $FieldMap -Raw -Encoding UTF8|ConvertFrom-Json;foreach($prop in $spec.psobject.Properties){$special[$prop.Name]=$prop.Value;$fields[$prop.Name]=[string]$prop.Value.value}}
+ if($FieldMap){$spec=Get-Content -LiteralPath $FieldMap -Raw -Encoding UTF8|ConvertFrom-Json;foreach($prop in $spec.psobject.Properties){if($excel -and $known -and $map.Contains($prop.Name)){continue};$special[$prop.Name]=$prop.Value;$fields[$prop.Name]=[string]$prop.Value.value}}
  $registerRepaired=$false
  if($excel -and $special.Keys -match '^row'){
   SetupRegisterPrint $sheet
