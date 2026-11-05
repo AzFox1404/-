@@ -23,18 +23,29 @@ def install_repaint(canvas, inner):
     canvas.bind('<Map>',clip_children,add='+')
     def schedule(*args):
         if painting[0]:return
-        current=(canvas.xview(),canvas.yview(),canvas.winfo_width(),canvas.winfo_height())
+        current=(canvas.xview(),canvas.yview(),canvas.winfo_width(),canvas.winfo_height(),inner.winfo_y(),inner.winfo_height())
         if current==last[0]:return
         last[0]=current
         if pending[0] is None:pending[0]=canvas.after_idle(flush)
     def flush():
         pending[0]=None;painting[0]=True
-        try:repaint(canvas)
+        try:
+            # RedrawWindow only invalidates HWNDs. Tk paints its controls in
+            # idle callbacks, so request complete Tk redraws after the move.
+            canvas.event_generate('<Expose>')
+            inner.event_generate('<Expose>')
+            top=-inner.winfo_y()
+            bottom=top+canvas.winfo_height()
+            for child in inner.winfo_children():
+                y=child.winfo_y()
+                if y<bottom and y+child.winfo_height()>top:
+                    child.event_generate('<Expose>')
         finally:painting[0]=False
     def cancel(e):
         if e.widget is canvas and pending[0] is not None:
             canvas.after_cancel(pending[0]);pending[0]=None
     canvas.bind('<Configure>',schedule,add='+');canvas.bind('<Destroy>',cancel,add='+')
+    inner.bind('<Configure>',schedule,add='+')
     canvas.repaint_after_scroll=schedule
     return schedule
 

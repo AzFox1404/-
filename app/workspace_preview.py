@@ -366,8 +366,8 @@ class Workspace:
         inner=tk.Frame(canvas,bg=PAPER);item=canvas.create_window(0,0,window=inner,anchor='nw')
         repaint=install_repaint(canvas,inner)
         canvas.configure(yscrollcommand=lambda a,z:(scroll.set(a,z),repaint()));scroll.pack(side='right',fill='y');canvas.pack(fill='both',expand=True)
-        inner.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')))
-        canvas.bind('<Configure>',lambda e:canvas.itemconfigure(item,width=e.width))
+        inner.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')),add='+')
+        canvas.bind('<Configure>',lambda e:canvas.itemconfigure(item,width=e.width),add='+')
         for key,text in (self.visible_fields(s,vals,b) if hasattr(self,"visible_fields") else vals).items():
             tk.Label(inner,text=getattr(s,'labels',{}).get(key,LABELS.get(key,key)),bg=PAPER,anchor='w').pack(fill='x',padx=12,pady=(6,1))
             if key in DATES:
