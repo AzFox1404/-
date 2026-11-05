@@ -8,7 +8,7 @@ def repaint(widget, immediate=True):
     u.RedrawWindow.argtypes=[W.HWND,C.c_void_p,W.HRGN,W.UINT]
     u.RedrawWindow(widget.winfo_id(),None,None,0x85 | (0x100 if immediate else 0)) # invalidate, erase, all children
 
-def install_repaint(canvas):
+def install_repaint(canvas, inner):
     if getattr(canvas,'repaint_installed',False):return
     canvas.repaint_installed=True;pending=[None];painting=[False];last=[None]
     def clip_children(event=None):
@@ -16,18 +16,20 @@ def install_repaint(canvas):
         u=C.windll.user32
         u.GetWindowLongPtrW.argtypes=[W.HWND,C.c_int];u.GetWindowLongPtrW.restype=C.c_ssize_t
         u.SetWindowLongPtrW.argtypes=[W.HWND,C.c_int,C.c_ssize_t]
-        handle=canvas.winfo_id()
-        u.SetWindowLongPtrW(handle,-16,u.GetWindowLongPtrW(handle,-16)|0x02000000|0x04000000)
+        for widget in (canvas,inner):
+            handle=widget.winfo_id()
+            style=u.GetWindowLongPtrW(handle,-16)
+            u.SetWindowLongPtrW(handle,-16,style | 0x02000000 | 0x04000000)
     canvas.bind('<Map>',clip_children,add='+')
     def schedule(*args):
         if painting[0]:return
         current=(canvas.xview(),canvas.yview(),canvas.winfo_width(),canvas.winfo_height())
         if current==last[0]:return
         last[0]=current
-        if pending[0] is None:pending[0]=canvas.after(16,flush)
+        if pending[0] is None:pending[0]=canvas.after_idle(flush)
     def flush():
         pending[0]=None;painting[0]=True
-        try:repaint(canvas, immediate=False)
+        try:repaint(canvas)
         finally:painting[0]=False
     def cancel(e):
         if e.widget is canvas and pending[0] is not None:
@@ -136,8 +138,7 @@ def rounded_frame(window):
         # GDI's rounded region drops its far pixel; +1 reaches the client edge
         # exactly (verified with GetRgnBox), without exposing non-client pixels.
         region=g.CreateRoundRectRgn(ix,iy,ix+iw+1,iy+ih+1,20,20)
-        if u.SetWindowRgn(hwnd,region,True):repaint(window,immediate=False)
-        else:g.DeleteObject(region)
+        if not u.SetWindowRgn(hwnd,region,True):g.DeleteObject(region)
 
 def transition(window,action):
     """Coalesce native window geometry changes into one repaint."""

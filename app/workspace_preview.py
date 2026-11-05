@@ -305,7 +305,7 @@ class Workspace:
     def detach(self,n,maximized=False):
         self.collapsed.discard(n)
         self.panel_contents.pop(n,None);self.collapsed_dirty.discard(n)
-        win=tk.Toplevel(self.root);win.title(NAMES[n]+' · Бюро ИД');win.geometry('760x650')
+        win=tk.Toplevel(self.root);win.withdraw();win.title(NAMES[n]+' · Бюро ИД');win.geometry('760x650')
         self.windows[n]=win
         from windows_integration import normal_window
         normal_window(win)
@@ -315,6 +315,7 @@ class Workspace:
         win.protocol('WM_DELETE_WINDOW',lambda:self.dock(n))
         if hasattr(self,'escape_full'):win.bind('<Escape>',self.escape_full,add='+')
         self.build(n)
+        win.deiconify()
         if maximized:
             win._maximize_from_dock=True;self.maximize(win)
 
@@ -362,9 +363,9 @@ class Workspace:
             ttk.Label(b,text='Для этого шаблона ещё не назначены поля.',padding=10).pack();return
         canvas=tk.Canvas(b,bg=PAPER,highlightthickness=0);self.form_canvas=canvas;scroll=Scrollbar(b,command=canvas.yview)
         from ui_surface import install_repaint
-        repaint=install_repaint(canvas)
-        canvas.configure(yscrollcommand=lambda a,z:(scroll.set(a,z),repaint()));scroll.pack(side='right',fill='y');canvas.pack(fill='both',expand=True)
         inner=tk.Frame(canvas,bg=PAPER);item=canvas.create_window(0,0,window=inner,anchor='nw')
+        repaint=install_repaint(canvas,inner)
+        canvas.configure(yscrollcommand=lambda a,z:(scroll.set(a,z),repaint()));scroll.pack(side='right',fill='y');canvas.pack(fill='both',expand=True)
         inner.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')))
         canvas.bind('<Configure>',lambda e:canvas.itemconfigure(item,width=e.width))
         for key,text in (self.visible_fields(s,vals,b) if hasattr(self,"visible_fields") else vals).items():

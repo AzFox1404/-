@@ -42,8 +42,8 @@ class Interface:
                 from windows_integration import theme_caption
                 theme_caption(w,self.colors,self.dark)
                 from windows_integration import close_only
-                close_only(w)
                 detached=w in getattr(self,'windows',{}).values()
+                if not detached and not getattr(w,'_taskbar_utility',False):close_only(w)
                 if not detached:
                     from app_dialogs import place_window
                     w.after_idle(lambda target=w:place_window(self,target))
@@ -232,7 +232,7 @@ class Interface:
             bg=parent.cget('background') if isinstance(parent,tk.Frame) else self.style.lookup(parent.cget('style') or 'TFrame','background') or c['bg']
             btn.configure(bg=bg)
             im=Image.new('RGB',(width*3,81),bg)
-            if state['hover'] or state['press'] or btn.focus_get()==btn:
+            if state['hover'] or state['press'] or str(btn.tk.call('focus'))==str(btn):
                 ImageDraw.Draw(im).rounded_rectangle((2,2,width*3-3,78),radius=18,fill=c['sel'] if state['press'] else c['hover'])
             btn.back=ImageTk.PhotoImage(im.resize((width,27),Image.Resampling.LANCZOS));btn.delete('all')
             btn.create_image(0,0,anchor='nw',image=btn.back);btn.hover_glyph=command_icon(self.root,getattr(btn,'glyph',key),'#111111') if state['hover'] and not state['press'] else self.icon(getattr(btn,'glyph',key));btn.create_image(14,13,image=btn.hover_glyph)
@@ -278,7 +278,9 @@ class Interface:
             self.toolbar(row,None,inline=True)
         ttk.Separator(row,orient='vertical').pack(side='left',fill='y',padx=6)
         self.style.configure('Context.TLabel',background=self.colors['glass'],foreground=self.colors['muted'],font=('Segoe UI',10),padding=(8,3))
-        ttk.Label(row,style='Context.TLabel',text=(self.project.name if len(self.project.name)<=30 else self.project.name[:27]+'…') if in_editor else 'Проекты').pack(side='left',padx=3)
+        context=ttk.Label(row,style='Context.TLabel',text='Проекты')
+        context.pack(side='left',padx=3)
+        if in_editor:self.project_context=context
         moon=self.icon_button(row,'moon','Тёмная тема',lambda:self.toggle_theme(1));moon.pack_forget();moon.pack(side='right')
         self.toggle_control(row)
         sun=self.icon_button(row,'sun','Светлая тема',lambda:self.toggle_theme(0));sun.pack_forget();sun.pack(side='right')

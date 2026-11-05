@@ -25,7 +25,9 @@ def install(window,colors,dark):
             command=window.protocol('WM_DELETE_WINDOW')
             if command:window.tk.eval(command)
             else:window.destroy()
-        def maximize():window.state('normal' if window.state()=='zoomed' else 'zoomed')
+        def maximize():
+            if all(map(int,window.resizable())):
+                window.state('normal' if window.state()=='zoomed' else 'zoomed')
         buttons=[]
         for symbol,command in [('×',close),*([('□',maximize),('—',window.iconify)] if isinstance(window,tk.Tk) else [])]:
             b=ttk.Button(bar,text=symbol,command=command,style='Window.TButton',width=3,takefocus=False);b.window_button=True;b.pack(side='right');buttons.append(b)
@@ -36,7 +38,7 @@ def install(window,colors,dark):
             return 'break'
         for target in (bar,label,bar.logo):
             target.bind('<ButtonPress-1>',move)
-            target.bind('<Double-Button-1>',lambda e=None:maximize() if isinstance(window,tk.Tk) else None)
+            target.bind('<Double-Button-1>',lambda e:(maximize(),'break')[1])
         bar.label=label;bar.buttons=buttons
         original=window.title
         if not getattr(window,'_caption_title_hook',False):
@@ -65,8 +67,11 @@ def install(window,colors,dark):
             handle=u.GetParent(window.winfo_id())
             if not handle:return
             style=u.GetWindowLongPtrW(handle,-16)
-            if style & 0x00c00000:
-                u.SetWindowLongPtrW(hwnd(),-16,style & ~0x00c00000)
+            wanted=style & ~0x00c00000
+            if not full and not getattr(window,'_close_only',False) and all(map(int,window.resizable())):
+                wanted|=0x00090000
+            if wanted!=style:
+                u.SetWindowLongPtrW(hwnd(),-16,wanted)
                 u.SetWindowPos(hwnd(),None,0,0,0,0,0x37)
             from ui_surface import rounded_frame
             rounded_frame(window)

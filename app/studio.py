@@ -105,6 +105,7 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
             self.split.pack_forget();self.header.pack_forget()
             for n in list(self.windows):self.dock(n)
         if getattr(self,'landing',None) and self.landing.winfo_exists():self.landing.destroy()
+        self.root.title('Бюро ИД · Проекты')
         self.landing=tk.Frame(self.root,bg=BG);self.landing.pack(fill='both',expand=True)
         self.commands(self.landing)
         self.toolbar(self.landing,3)
@@ -163,6 +164,13 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         except Exception as e:
             shutil.rmtree(dest,ignore_errors=True);messagebox.showerror('Импорт',str(e));return
         self.analyze_import(dest,lambda:self.enter(dest))
+    def project_display_name(self):
+        try:
+            name=json.loads((self.project/'project.json').read_text('utf-8')).get('name')
+        except (OSError,ValueError,AttributeError):
+            name=None
+        return name.strip() if isinstance(name,str) and name.strip() else self.project.name
+
     def enter(self,project,_approved=False):
         if getattr(self,'stopping',False):self.root.after(120,lambda:self.enter(project,_approved));return
         if not _approved and self.project and self.project!=project and hasattr(self,"models"):
@@ -196,6 +204,9 @@ class Studio(ProjectAnalysis,FolderOperations,SaveDecisions,QualityLibrary,Inter
         else:
             self.header.pack(fill='x',before=self.split) if self.split.winfo_manager() else self.header.pack(fill='x')
             self.split.pack(fill='both',expand=True)
+        name=self.project_display_name()
+        self.project_context.configure(text=name if len(name)<=30 else name[:27]+'…')
+        self.root.title('Бюро ИД · '+name)
         self.paths=paths;self.current=None
         for n in range(4):self.build(n)
         self.set_palette();self.paint(self.root)

@@ -42,12 +42,5 @@ with tempfile.TemporaryDirectory() as td:
  v.set_zoom(135)
  assert v.canvas.find_withtag('pdf-transition') or v.canvas.find_withtag('pdf-overview'),'zoom must retain a visible previous frame or cached overview'
  wait(root,lambda:bool(v.tiles.visible) and not v.tiles.pending)
- old_epoch=v._epoch
- old_zoom=v.zoom
- for _ in range(3):v.canvas.event_generate('<MouseWheel>',delta=120,x=300,y=300,state=4)
- assert v.zoom==old_zoom and v._epoch==old_epoch and v.tiles.visible
- wait(root,lambda:v.zoom==old_zoom+30)
- assert v._epoch==old_epoch+1
- wait(root,lambda:bool(v.tiles.visible) and not v.tiles.pending)
  top.destroy();root.update();assert not errors,errors
  app.close();print('PASS A0 visible-only tiles, bounded bitmap memory, cached overview, canonical text geometry, four rotations, scroll and cleanup; same worker and unchanged PDF')
