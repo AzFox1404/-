@@ -16,7 +16,6 @@ class PagePreview(ttk.Frame):
         self.app=app;self.path=None;self.number=0;self.rotations={};self.zoom=70;self.image=None
         self.pages=[];self.images={};self._pending=None;self._sizes=None;self._zoom_job=None;self._wanted_zoom=None;self._text_cache={}
         self._bitmap_cache=OrderedDict();self._bitmap_bytes=0
-        self._zoom_frame=None;self._interactive_zoom=False
         self.quick_values={};self.quick_anchors={};self.quick_changes={};self._quick_requested=False;self._quick_fonts={}
         self.renderer=PDFRenderer();self._generation=0;self._epoch=0;self._requested=set();self._render_poll=None
         from pdf_tiles import Tiles
@@ -78,7 +77,7 @@ class PagePreview(ttk.Frame):
 
     def cleanup(self,event):
         if event.widget is self:
-            if self._zoom_frame is not None:self.after_cancel(self._zoom_frame);self._zoom_frame=None
+            self.cancel_zoom()
             self.renderer.close()
             if self._render_poll is not None:self.after_cancel(self._render_poll);self._render_poll=None
             # Release native Tk resources here, not later in a background GC
@@ -149,35 +148,27 @@ class PagePreview(ttk.Frame):
         self._wanted_zoom=max(25,min(200,level+(10 if event.delta>0 else -10)))
         self._zoom_anchor=(event.x,event.y)
         if self._zoom_job is not None:self.after_cancel(self._zoom_job)
-        self._interactive_zoom=True
-        if self._zoom_frame is None:self._zoom_frame=self.after(16,self.zoom_frame)
-        self._zoom_job=self.after(140,self.finish_zoom);return 'break'
+        self._zoom_job=self.after(100,self.finish_zoom);return 'break'
 
     def cancel_zoom(self):
-        for name in ('_zoom_frame','_zoom_job'):
-            job=getattr(self,name,None)
-            if job is not None:self.after_cancel(job);setattr(self,name,None)
-        self._wanted_zoom=None;self._interactive_zoom=False
-
-    def zoom_frame(self):
-        self._zoom_frame=None
-        level=self._wanted_zoom;self._wanted_zoom=None
-        if level is not None:self.set_zoom(level,self._zoom_anchor,draft=True)
+        if self._zoom_job is not None:
+            self.after_cancel(self._zoom_job);self._zoom_job=None
+        self._wanted_zoom=None
 
     def finish_zoom(self):
         self._zoom_job=None
-        if self._zoom_frame is not None:self.after_cancel(self._zoom_frame);self._zoom_frame=None
-        self.zoom_frame();self._interactive_zoom=False;self.render_visible()
+        level=self._wanted_zoom;self._wanted_zoom=None
+        if level is not None and level!=self.zoom:self.set_zoom(level,self._zoom_anchor)
 
-    def set_zoom(self,value,anchor=None,draft=False):
-        if not draft:self.cancel_zoom()
+    def set_zoom(self,value,anchor=None):
+        self.cancel_zoom()
         point=None
         if anchor and self.pages:
             x,y=anchor;cx=self.canvas.canvasx(x);cy=self.canvas.canvasy(y);n=self.page_at(cy);top,w,h,_=self.pages[n]
             point=(n,(cx-8)/w,(cy-top)/h,x,y)
         self.zoom=max(25,min(200,value));self.scale.set(self.zoom)
         if hasattr(self,'on_zoom'):self.on_zoom(self.zoom)
-        self.render(defer=bool(point),draft=draft)
+        self.render(defer=bool(point))
         if point:
             n,fx,fy,x,y=point;top,w,h,_=self.pages[n]
             total=max(p[1] for p in self.pages)+16
@@ -197,7 +188,7 @@ class PagePreview(ttk.Frame):
         self.cancel_zoom()
         key=str(self.number);self.rotations[key]=(self.rotations.get(key,0)+degrees)%360;self.render()
 
-    def render(self,defer=False,draft=False):
+    def render(self,defer=False):
         if self.path is None:return
         if self._sizes is None:return
         self._epoch+=1;self.renderer.set_epoch(self._epoch);self._requested.clear()
@@ -215,9 +206,9 @@ class PagePreview(ttk.Frame):
             self.canvas.addtag_withtag('pdf-transition','pdf-tile');self.canvas.dtag('pdf-tile','pdf-tile')
             self.images.clear();self.tiles.reset();self._retained_images=[]
             self.render_visible();return
-        previous=[] if draft else [(k,photo) for k,(_,photo) in self.tiles.visible.items() if (k[0],k[2]) not in self.tiles.overviews]
-        if not draft:previous.extend(getattr(self,'_retained_images',[]));self._retained_images=[]
-        for n,photo in (() if draft else self.images.items()):
+        previous=[(k,photo) for k,(_,photo) in self.tiles.visible.items() if (k[0],k[2]) not in self.tiles.overviews]
+        previous.extend(getattr(self,'_retained_images',[]));self._retained_images=[]
+        for n,photo in self.images.items():
             rotation=self.rotations.get(str(n),0)
             if (n,rotation) in self.tiles.overviews:continue
             if self.selection.pages.get(n,{}).get('rotation')==rotation:
@@ -265,9 +256,7 @@ class PagePreview(ttk.Frame):
         visible=set(range(self.page_at(top-160),self.page_at(bottom+160)+1))
         for n in set(self.images)-visible:
             self.canvas.delete('image'+str(n));del self.images[n]
-        self.tiles.update(visible,draft=self._interactive_zoom)
-        if self._interactive_zoom:
-            self.number=self.page_at(top);self.update_label();self.rulers.draw();self.draw_quick();return
+        self.tiles.update(visible)
         missing={n for n in visible-set(self.images) if not self.tiles.large(n)}
         for n in sorted(missing):
             key=(n,self.zoom,self.rotations.get(str(n),0))
