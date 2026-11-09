@@ -55,6 +55,90 @@ try:
             assert difference is None, (family, cycle, difference)
         assert all(value.get() == f'Value {index}' for index, value in enumerate(variables))
         print(f'PASS {family}: 40 immediate scroll frames, {time.monotonic()-started:.2f}s', flush=True)
+    from interactions import Interactions
+    app = Interactions()
+    app.root = root
+    app.form_canvas = canvas
+    app.form_mouse(canvas)
+    errors = []
+    root.report_callback_exception = lambda *error: errors.append(str(error[1]))
+    counts = {'events': 0, 'frames': 0}
+    started = time.monotonic()
+    previous = [started]
+    gaps = []
+    snapshots = []
+    running = [True]
+
+    def feed():
+        if not running[0]:
+            return
+        elapsed = time.monotonic()-started
+        # Keep the event queue occupied, reversing direction every 80ms.
+        canvas.event_generate('<MouseWheel>', delta=120 if int(elapsed/.08)%2 else -120)
+        counts['events'] += 1
+        root.after(0, feed)
+
+    def inspect_frame():
+        if not running[0]:
+            return
+        now = time.monotonic()
+        gaps.append(now-previous[0])
+        previous[0] = now
+        counts['frames'] += 1
+        if counts['frames'] % 5 == 0:
+            x, y = canvas.winfo_rootx(), canvas.winfo_rooty()
+            box = (x, y, x+canvas.winfo_width(), y+canvas.winfo_height())
+            immediate = ImageGrab.grab(bbox=box)
+            # Repaint the SAME position to obtain a reference, without
+            # servicing queued wheel/timer events.
+            for child in inner.winfo_children():
+                child.event_generate('<Expose>')
+            inner.event_generate('<Expose>')
+            canvas.event_generate('<Expose>')
+            root.update_idletasks()
+            settled = ImageGrab.grab(bbox=box)
+            snapshots.append(ImageChops.difference(immediate, settled).getbbox())
+        if now-started >= 12:
+            running[0] = False
+            root.quit()
+        else:
+            root.after(16, inspect_frame)
+
+    root.after(0, feed)
+    root.after(20, inspect_frame)
+    root.mainloop()
+    assert not errors, errors
+    assert counts['events'] > 500 and counts['frames'] > 30, counts
+    assert snapshots and not any(snapshots), snapshots
+    assert max(gaps) < .5, max(gaps)
+    assert all(value.get() == f'Value {index}' for index, value in enumerate(variables))
+    print('PASS continuous reversing wheel', counts, 'worst heartbeat ms', round(max(gaps)*1000), flush=True)
+
+    # Pending wheel movement must yield to explicit scrollbar navigation.
+    canvas.yview_moveto(.5)
+    root.update_idletasks()
+    canvas.scroll_form_units(4)
+    canvas.yview_moveto(.25)
+    wanted = canvas.yview()
+    root.update_idletasks()
+    end = time.monotonic()+.05
+    while time.monotonic()<end:
+        root.update()
+    assert canvas.yview() == wanted
+    # Clamping is applied in event order, so reversal at an edge responds.
+    canvas.yview_moveto(0)
+    root.update_idletasks()
+    canvas.scroll_form_units(-1000)
+    canvas.scroll_form_units(1)
+    end = time.monotonic()+.05
+    while time.monotonic()<end:
+        root.update()
+    assert canvas.yview()[0] > 0
+    canvas.scroll_form_units(1000)
+    canvas.destroy()
+    root.update()
+    assert not errors, errors
+
 finally:
     root.destroy()
     ctypes.windll.user32.SetCursorPos(cursor.x, cursor.y)
