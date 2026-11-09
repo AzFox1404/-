@@ -78,7 +78,8 @@ class Interactions:
         def scroll(e):
             canvas=getattr(self,'form_canvas',None)
             if canvas and canvas.winfo_exists() and e.delta:
-                canvas.scroll_form_units(-int(e.delta/120) or (-1 if e.delta>0 else 1))
+                if getattr(canvas,'auto_scroll_state',{}).get('active'):canvas.stop_auto_scroll()
+                canvas.form_surface.wheel(-int(e.delta/120) or (-1 if e.delta>0 else 1))
             return 'break'
         def escape(e):
             panel.focus_set()

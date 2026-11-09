@@ -362,12 +362,9 @@ class Workspace:
         if not vals:
             ttk.Label(b,text='Для этого шаблона ещё не назначены поля.',padding=10).pack();return
         canvas=tk.Canvas(b,bg=PAPER,highlightthickness=0);self.form_canvas=canvas;scroll=Scrollbar(b,command=canvas.yview)
-        from ui_surface import install_repaint
-        inner=tk.Frame(canvas,bg=PAPER);item=canvas.create_window(0,0,window=inner,anchor='nw')
-        repaint=install_repaint(canvas,inner)
-        canvas.configure(yscrollcommand=lambda a,z:(scroll.set(a,z),repaint()));scroll.pack(side='right',fill='y');canvas.pack(fill='both',expand=True)
-        inner.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')),add='+')
-        canvas.bind('<Configure>',lambda e:canvas.itemconfigure(item,width=e.width),add='+')
+        from form_surface import FormSurface
+        inner=tk.Frame(canvas,bg=PAPER)
+        scroll.pack(side='right',fill='y');canvas.pack(fill='both',expand=True)
         for key,text in (self.visible_fields(s,vals,b) if hasattr(self,"visible_fields") else vals).items():
             tk.Label(inner,text=getattr(s,'labels',{}).get(key,LABELS.get(key,key)),bg=PAPER,anchor='w').pack(fill='x',padx=12,pady=(6,1))
             if key in DATES:
@@ -382,6 +379,8 @@ class Workspace:
                 var.trace_add('write',lambda *a,k=key,v=var:self.changed(s,k,v.get()))
             e.pack(fill='x',padx=12,ipady=3)
         ttk.Label(inner,text='Даты вводятся как ДД.ММ.ГГГГ. В документе применяется формат шаблона.',wraplength=300,padding=10).pack(anchor='w')
+
+        canvas.form_surface=FormSurface(canvas,inner,scroll.set,lambda:getattr(self,'colors',{'paper':PAPER,'line':'#d7cbc2','text':'#222222'}))
 
     @staticmethod
     def human(iso):

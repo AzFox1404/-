@@ -13,10 +13,11 @@
 | Панель задач при fullscreen | `app/taskbar_reveal.py` | нижняя зона 24px; маска окна, без изменения настроек Windows |
 | Темы, иконки, подсказки, ленты | `app/ui_tools.py`, `app/command_icons.py`, `app/hints.py` | `app/app_dialogs.py`, `app/windows_integration.py` |
 | Заголовки окон в теме приложения | `app/window_caption.py` | native resize/move и taskbar сохранены; `windows_integration.theme_caption` |
-| Рамки/скругления и восстановление отрисовки | `app/ui_surface.py` | видимая client-region без Python WndProc; restore_client_size после fullscreen; планировщик кадров прокрутки, кэш геометрии видимых полей |
+| Рамки/скругления и восстановление отрисовки | `app/ui_surface.py` | видимая client-region без Python WndProc; restore_client_size после fullscreen; скруглённая область окна и восстановление размеров |
 | Тонкие полосы прокрутки | `app/smooth_scrollbar.py` | стандартные set/moveto/scroll; скруглённый thumb и hover 120 мс |
 | Панели: отделить, скрыть, вернуть | `app/workspace_preview.py` (`pane_header`, `collapse_panel`, `restore_panel`) | `studio.build`, `app/save_decisions.py` |
 | Перетягивание стеклянных панелей | `app/glass_resize.py` | `tests/verify_home_drag_release.py`, `tests/verify_glass_resize.py` |
+| Отрисовка полей и прокрутка | `app/form_surface.py` | Canvas и нативный редактор активного поля; `verify_form_scroll_frames.py` |
 | Поля ввода/выбор строки | `app/studio.py` (`visible_fields`, `queue_register_operation`) | `app/office_forms.py`, `app/act_layout.py` |
 | Общие пути и локальная конфигурация | `app/app_paths.py` | `BUREAU_ID_DATA_DIR`, `BUREAU_ID_EXAMPLES_DIR` |
 | Очередь Office и ответы | `workspace_preview.Session` | `app/PreviewWorker.ps1`; clean PDF перед review PDF, до двух тёплых сеансов |

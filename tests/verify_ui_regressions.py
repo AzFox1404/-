@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory() as td:
     entry=next(w for w in body.winfo_children() if isinstance(w,tk.Canvas))
     def descend(w):
         for c in w.winfo_children():yield c;yield from descend(c)
-    field=next(w for w in descend(body) if isinstance(w,ttk.Combobox));field.focus_force();pump(root)
+    field=next(w for w in descend(body) if isinstance(w,ttk.Combobox));app.form_canvas.form_surface.activate(field);field.focus_force();pump(root)
     app.views['field0'].set('Первый текст');app.views['field0'].set('Новый текст')
     def key(code,state=4):field.event_generate('<KeyPress>',keycode=code,state=state);pump(root,.02)
     key(90);assert field.get()=='Первый текст',field.get()
@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory() as td:
     key(90,5);assert field.get()=='Замена','Ctrl+Shift+Z redo'
     canvas=app.form_canvas
     for _ in range(15):canvas.yview_scroll(10,'units');pump(root,.02)
-    assert canvas.yview()[0]>0 and canvas.repaint_installed
+    assert canvas.yview()[0]>0 and canvas.form_surface.active is field
     for _ in range(15):canvas.yview_scroll(-10,'units');pump(root,.02)
     assert canvas.yview()[0]==0 and field.get()=='Замена'
     for cycle in range(120):
