@@ -14,6 +14,10 @@ with tempfile.TemporaryDirectory() as td:
  source=next(SAMPLES.rglob('АОСР*.xlsx'));shutil.copy2(source,project/'Документы'/source.name)
  root=tk.Tk();app=studio.Studio(root);errors=[];root.report_callback_exception=lambda *e:(errors.append(str(e[1])),__import__('traceback').print_exception(*e));app.ensure_project_passports=lambda p:None;app.ask_save=lambda t,cb:cb('save');app.enter(project)
  pump(root,lambda:app.current in app.latest,60);assert app.current in app.latest,errors
+ surface=app.form_canvas.form_surface
+ assert app.views and len(surface.rows)==len(app.views),errors
+ labels=[app.form_canvas.itemcget(item,'text') for item in app.form_canvas.find_withtag('form-row') if app.form_canvas.type(item)=='text']
+ assert 'Общие данные проекта' in labels and 'Акт и участники' in labels,labels
  key=next(k for k in app.views if k in DATES);app.views[key].set('01.');old_views=app.views;old_pdf=app.pdf_viewer;model=dict(app.models[app.current])
  for n in (0,1,2,3):
   host=app.holders[n];packed=list(host.pack_slaves());app.collapse_panel(n);pump(root)

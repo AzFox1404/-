@@ -112,6 +112,9 @@ try:
     assert all(value.get() == f'Value {index}' for index, value in enumerate(variables))
     print('PASS continuous reversing wheel', counts, 'worst heartbeat ms', round(max(gaps)*1000), flush=True)
 
+    # Finish the last scheduled wheel step before starting the click scenario.
+    root.after(120, root.quit)
+    root.mainloop()
     items = canvas.find_withtag('form-row')
     fields = list(surface.editors)
     variables[1].set('Changed value')

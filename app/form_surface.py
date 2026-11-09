@@ -76,7 +76,7 @@ class FormSurface:
             else:
                 style = widget.cget('style') if isinstance(widget, ttk.Label) else ''
                 face = widget.cget('font') or self.style.lookup(style or 'TLabel', 'font') or 'TkDefaultFont'
-                wrap = widget.winfo_pixels(widget.cget('wraplength'))
+                wrap = widget.winfo_pixels(widget.cget('wraplength') or 0)
                 inset = 10 if wrap else 0
                 canvas.create_text(left+inset, y+height/2, anchor='w', text=widget.cget('text'),
                                    width=min(wrap, available) if wrap else 0,
