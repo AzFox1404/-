@@ -154,6 +154,26 @@ try:
     assert sum(field.winfo_ismapped() for field in fields) == 1
     assert not errors, errors
     print('PASS only changed value updates; dropdown and bidirectional Tab', flush=True)
+    canvas.yview_moveto(0)
+    for index in range(3):
+        surface.activate(fields[index])
+        fields[index].delete(0, 'end')
+        fields[index].insert(0, str(87+index))
+        fields[index].event_generate('<Tab>')
+        root.update()
+        assert variables[index].get() == str(87+index)
+        assert canvas.itemcget(surface.rows[fields[index]][4], 'text') == str(87+index)
+    # A stale display must be refreshed when its native editor is unmounted.
+    surface.activate(fields[0])
+    canvas.itemconfigure(surface.rows[fields[0]][4], text='')
+    surface.activate(fields[1])
+    assert canvas.itemcget(surface.rows[fields[0]][4], 'text') == '87'
+    fields[1].delete(0, 'end')
+    surface.activate(fields[2])
+    root.update()
+    assert canvas.itemcget(surface.rows[fields[1]][4], 'text') == ''
+    print('PASS native typing, switching fields, stale display recovery and clearing', flush=True)
+
 
 finally:
     root.destroy()

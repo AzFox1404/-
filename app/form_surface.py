@@ -21,6 +21,7 @@ class FormSurface:
         self.fonts = {}
         self.refresh_job = None
         self.editor_job = None
+        self.value_jobs = {}
         self.view = None
         self.wheel_job = None
         self.wheel_origin = None
@@ -50,7 +51,7 @@ class FormSurface:
                     widget.bind('<Shift-Tab>', lambda event: self.tab(-1), add='+')
                     widget.bind('<FocusIn>', lambda event, field=widget: self.reveal(field), add='+')
                     name = str(widget.cget('textvariable'))
-                    command = self.canvas.register(lambda *args, field=widget: self.update_value(field))
+                    command = self.canvas.register(lambda *args, field=widget: self.value_written(field))
                     self.canvas.tk.call('trace', 'add', 'variable', name, 'write', command)
                     tag = f'field-{len(self.editors)}'
                     self.editors[widget] = (name, command, tag)
@@ -111,6 +112,20 @@ class FormSurface:
         text = canvas.create_text(x+8, y+height/2, anchor='w', font=self.fonts[face],
                                   fill=foreground, tags=tags)
         self.rows[widget] = (x, y, width, height, text, self.fonts[face], width-(30 if combo else 16))
+        self.update_value(widget)
+
+    def value_written(self, widget):
+        self.update_value(widget)
+        # Native Entry edits and other variable traces can still be running.
+        # Read again once Tk has completed the write and its display updates.
+        self.queue_value_refresh(widget)
+
+    def queue_value_refresh(self, widget):
+        if widget not in self.value_jobs:
+            self.value_jobs[widget] = self.canvas.after_idle(lambda: self.refresh_value(widget))
+
+    def refresh_value(self, widget):
+        self.value_jobs.pop(widget, None)
         self.update_value(widget)
 
     def update_value(self, widget):
@@ -180,6 +195,7 @@ class FormSurface:
         if self.active is not widget:
             self.pressed = None
             if self.active is not None:
+                self.update_value(self.active)
                 self.active.place_forget()
             self.active = widget
             widget.place(x=0, y=0, relwidth=1, relheight=1)
@@ -246,5 +262,7 @@ class FormSurface:
         for job in (self.refresh_job, self.editor_job, self.wheel_job):
             if job is not None:
                 self.canvas.after_cancel(job)
+        for job in self.value_jobs.values():
+            self.canvas.after_cancel(job)
         for name, command, _ in self.editors.values():
             self.canvas.tk.call('trace', 'remove', 'variable', name, 'write', command)
