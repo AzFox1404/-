@@ -58,6 +58,9 @@ def supplement(kind, texts, fields, add, has_image=False, font_sizes=None):
             if match:
                 key = 'appendixNumber' if match[1].lower() == 'приложение' else 'qualityNumber'
                 slot(key, 'Номер приложения' if key == 'appendixNumber' else 'Номер реестра качества', i, match.start(2), match.end(2))
+            address = re.search(r'по адресу:[ \t\u00a0]*(.*)$',value,re.I)
+            if address:
+                slot('regAddress','Адрес объекта',i,address.start(1),address.end(1))
             match = re.match(r'к Акту\s*(.*?)\s+от\s+(.*?)\s+освидетельствования скрытых работ(.*?)\s+по адресу:\s*(.*)$', value, re.I)
             if match:
                 for n, key, label in [(1, 'actRef', 'Номер связанного акта'), (2, 'refDate', 'Дата связанного акта'),

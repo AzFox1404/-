@@ -33,6 +33,26 @@
    if($part.suffix){$replacement+=[string]$part.suffix}
   }elseif([string]$part.sample -and !([string]$part.sample).Trim()){$replacement=[string]$part.sample}
   $range=$doc.Bookmarks.Item($name).Range.Duplicate
+  if($part.inline){
+   $replacement=([string]$replacement).Trim()
+   $paragraphRange=$range.Paragraphs.Item(1).Range
+   while($range.Start -gt $paragraphRange.Start){
+    $before=$doc.Range($range.Start-1,$range.Start).Text
+    if($before -notmatch '^[ \t\u00a0]$'){break}
+    $range.Start=$range.Start-1
+   }
+   while($range.End -lt $paragraphRange.End-1){
+    $after=$doc.Range($range.End,$range.End+1).Text
+    if($after -notmatch '^[ \t\u00a0]$'){break}
+    $range.End=$range.End+1
+   }
+   $before=if($range.Start -gt $paragraphRange.Start){[string]$doc.Range($range.Start-1,$range.Start).Text}else{''}
+   $after=if($range.End -lt $paragraphRange.End-1){[string]$doc.Range($range.End,$range.End+1).Text}else{''}
+   if($replacement){
+    if($before -match '[\p{L}\p{N}:№)»]$'){$replacement=' '+$replacement}
+    if($after -match '^[\p{L}\p{N}«№]'){$replacement+=' '}
+   }elseif($before -and $after -match '^[\p{L}\p{N}«№]'){$replacement=' '}
+  }
   foreach($paragraph in $range.Paragraphs){
    if($paragraph.Format.LineSpacingRule -eq 4){$paragraph.Format.LineSpacingRule=3}
   }

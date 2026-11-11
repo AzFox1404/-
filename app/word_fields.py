@@ -7,7 +7,7 @@ from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-VERSION=8
+VERSION=9
 MONTHS='января февраля марта апреля мая июня июля августа сентября октября ноября декабря'.split()
 DATE=re.compile(r'[«"“]?\s*\d{1,2}\s*[»"”]?\s*(?:[.\-/]\s*\d{1,2}\s*[.\-/]|(?:'+'|'.join(MONTHS)+r')\s*)\s*\d{4}\s*г?\.?',re.I)
 
@@ -96,7 +96,7 @@ def analyze_word(path,prepared=None):
         entries=[]
         for i,a,b in parts:
             claimed.add((i,a,b));counter+=1;name='BID_auto_'+str(counter)
-            entries.append(dict(bookmark=name,sample=texts[i][a:b],capacity=max(1,b-a)))
+            entries.append(dict(bookmark=name,sample=texts[i][a:b],capacity=max(1,b-a),inline=bool(texts[i].strip()) and (a>0 or b<len(texts[i]))))
             targets[name]=(paras[i],a,b,counter)
         fields[key]=dict(dest=entries[0]['bookmark'],segments=entries,value=date_value(sample) if typ=='worddate' else sample,label=label,kind='datecell' if typ=='worddate' else 'text',word=True,worddate=typ=='worddate',sample=sample)
     def whole(i):
@@ -250,8 +250,8 @@ def analyze_word(path,prepared=None):
                 if match:add('actRef','Номер связанного акта',[(i,match.start(1),match.end(1))])
                 date=DATE.search(v)
                 if date:add('refDate','Дата связанного акта',[(i,date.start(),date.end())],'worddate')
-                obj=re.search(r'на объекте\s+(.+)$',v,re.I)
-                if obj:add('regAddress','Объект и адрес',[(i,obj.start(1),obj.end(1))])
+                obj=re.search(r'на объекте\s+(.+?)(?=\s+по адресу:|$)',v,re.I)
+                if obj:add('regObject','Объект',[(i,obj.start(1),obj.end(1))])
                 work=re.search(r'освидетельствования (?:скрытых работ|строительных конструкций)\s+[«\"](.+?)[»\"]\s+на объекте',v,re.I)
                 if work:add('refWork','Работы / конструкции связанного акта',[(i,work.start(1),work.end(1))])
             elif re.match(r'^\s*составил',v,re.I):

@@ -55,7 +55,7 @@ def _existing_fields(path):
                 try:cached=list(ref.active.values)
                 finally:ref.close()
             v=cached[row-1][col-1]
-        if prefix and isinstance(v,str) and v.startswith(prefix):v=v[len(prefix):]
+        if prefix and isinstance(v,str) and v.startswith(prefix.rstrip()):v=v[len(prefix.rstrip()):].lstrip()
         if isinstance(v,(datetime.datetime,datetime.date)):v=v.strftime('%d.%m.%Y')
         add(key,addr,v,label,kind,prefix)
     if general:
