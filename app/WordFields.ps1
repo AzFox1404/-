@@ -28,8 +28,26 @@
     $replacement=$remaining.Substring(0,$cut);$remaining=$remaining.Substring($cut).TrimStart()
    }
   }
+  if($replacement){
+   if($part.prefix){$replacement=[string]$part.prefix+$replacement}
+   if($part.suffix){$replacement+=[string]$part.suffix}
+  }elseif([string]$part.sample -and !([string]$part.sample).Trim()){$replacement=[string]$part.sample}
   $range=$doc.Bookmarks.Item($name).Range.Duplicate
+  foreach($paragraph in $range.Paragraphs){
+   if($paragraph.Format.LineSpacingRule -eq 4){$paragraph.Format.LineSpacingRule=3}
+  }
+  if($range.Information(12)){
+   foreach($cell in $range.Cells){
+    if($cell.HeightRule -eq 2){$cell.HeightRule=1}
+    $cell.FitText=$false
+    $cell.WordWrap=$true
+    foreach($paragraph in $cell.Range.Paragraphs){
+     if($paragraph.Format.RightIndent -lt 0){$paragraph.Format.RightIndent=0}
+    }
+   }
+  }
   $range.Text=([string]$replacement).Replace("`n","`v")
+  if($part.fontSize){$range.Font.Size=[single]$part.fontSize}
   [void]$doc.Bookmarks.Add($name,$range)
  }
 }
@@ -39,10 +57,11 @@ function AddWordRegisterPosition([int]$row,[bool]$delete=$false,[bool]$after=$fa
  $tableIds=@($special.Keys | Where-Object {$_ -match '^row\d+_'} | ForEach-Object {$special[$_].wordTable} | Sort-Object -Unique)
  if($tableIds.Count -gt 1){throw 'В документе несколько таблиц реестров. Сначала требуется отдельная привязка выбранной таблицы.'}
  $entry=$special[$template[0]];$table=$doc.Tables.Item([int]$entry.wordTable)
+ $columns=$table.Rows.Item($row).Cells.Count
  $labels=@{};$dateFlags=@{};$samples=@{}
  foreach($key in $template){$item=$special[$key];$c=[int]$item.wordColumn;$labels[$c]=$item.label;$dateFlags[$c]=$item.worddate;$samples[$c]=$item.sample}
  if($delete){
-  $positions=0;for($r=2;$r -le $table.Rows.Count;$r++){if(([string]$table.Rows.Item($r).Cells.Item(1).Range.Text).Trim([char]13,[char]7) -match '^\d+$'){$positions++}}
+  $positions=@($special.Keys | Where-Object {$_ -match '^row\d+_'} | ForEach-Object {[int]($_.Split('_')[0].Substring(3))} | Sort-Object -Unique).Count
   if($positions -le 1){for($c=2;$c -le $table.Rows.Item($row).Cells.Count;$c++){$cell=$table.Rows.Item($row).Cells.Item($c);$calculated=$false;foreach($field in $cell.Range.Fields){if(([string]$field.Code.Text) -match '^\s*='){$calculated=$true}};if(!$calculated){$cell.Range.Text=''}}}else{$table.Rows.Item($row).Delete()}
  }else{
  $first=(@($special.Keys|Where-Object {$_ -match '^row\d+_'}|ForEach-Object {[int]($_.Split('_')[0].Substring(3))}|Sort-Object)[0])
@@ -65,7 +84,7 @@ function AddWordRegisterPosition([int]$row,[bool]$delete=$false,[bool]$after=$fa
  $ordinal=0
  for($r=2;$r -le $table.Rows.Count;$r++){
   $first=$table.Rows.Item($r).Cells.Item(1).Range.Text.Trim([char]13,[char]7)
-  if(($delete -or $r -ne $new) -and $first -notmatch '^\d+$'){continue}
+  if(($delete -or $r -ne $new) -and $first -notmatch '^\d+$' -and !(!$first -and $table.Rows.Item($r).Cells.Count -eq $columns)){continue}
   $ordinal++;$table.Rows.Item($r).Cells.Item(1).Range.Text=[string]$ordinal
   foreach($c in $labels.Keys){
    $range=$table.Rows.Item($r).Cells.Item([int]$c).Range.Duplicate;$range.End=$range.End-1

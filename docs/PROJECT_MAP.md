@@ -22,8 +22,8 @@
 | Общие пути и локальная конфигурация | `app/app_paths.py` | `BUREAU_ID_DATA_DIR`, `BUREAU_ID_EXAMPLES_DIR` |
 | Очередь Office и ответы | `workspace_preview.Session` | `app/PreviewWorker.ps1`; clean PDF перед review PDF, до двух тёплых сеансов |
 | Excel: поля и перенос строк | `app/act_layout.py`, `app/ActFlow.ps1` | `data/act_anchors.json`, `app/BindExcel.ps1` |
-| Excel: реестры, вставка/удаление | `app/RegisterRows.ps1` | `app/register_selection.py` — диапазон после позиции до шапки; `app/office_forms.py`, `app/MakeRegistry.ps1` |
-| Word: распознавание и запись | `app/word_fields.py`, `app/WordFields.ps1` | `app/ConvertWord.ps1`, `app/manual_fields.py` |
+| Excel: реестры, вставка/удаление | `app/RegisterRows.ps1`, `app/register_layout.py` | `app/register_selection.py` — диапазон после позиции до шапки; `app/office_forms.py`, `app/MakeRegistry.ps1` |
+| Word: распознавание и запись | `app/word_fields.py`, `app/word_slots.py`, `app/WordFields.ps1` | `app/ConvertWord.ps1`, `app/manual_fields.py` |
 | Ручные привязки | `app/manual_fields.py`, `app/manual_excel.py` | `app/InspectExcel.ps1`, `app/BindExcel.ps1` |
 | Временный цвет PDF | `app/ReviewHighlight.ps1` | `Session.review_pdf`; `latest` всегда чистый |
 | Быстрый слой / итоговый кэш | `app/fast_preview.py`, `app/final_pdf_cache.py` | `docs/HYBRID_EDITOR.md`; Canvas только для просмотра, кэш только для подтверждённых файлов |

@@ -112,3 +112,33 @@ function SetActText($key,$value){
  }
 }
 
+
+function FitExcelText($cell){
+ $area=$cell.MergeArea
+ if(!$script:probeBook){$script:probeBook=$app.Workbooks.Add()}
+ $probe=$script:probeBook.Worksheets.Item(1).Range('A2')
+ [void]$probe.Clear()
+ $probe.Font.Name=$cell.Font.Name;$probe.Font.Size=$cell.Font.Size
+ $probe.Font.Bold=$cell.Font.Bold;$probe.Font.Italic=$cell.Font.Italic
+ $probe.WrapText=$true;$probe.ShrinkToFit=$false
+ $probe.NumberFormat='@';$probe.Value2=[string]$cell.Value2
+ if(!$script:fitWidths){$script:fitWidths=@{}}
+ $widthKey=[string]$area.Width
+ if(!$script:fitWidths.ContainsKey($widthKey)){
+  $low=0.1;$high=255.0
+  for($n=0;$n -lt 16;$n++){
+   $mid=($low+$high)/2;$probe.ColumnWidth=$mid
+   if($probe.Width -gt $area.Width-3){$high=$mid}else{$low=$mid}
+  }
+  $script:fitWidths[$widthKey]=$low
+ }
+ $probe.ColumnWidth=$script:fitWidths[$widthKey]
+ [void]$probe.EntireRow.AutoFit()
+ $height=[double]$probe.RowHeight+3
+ $area.WrapText=$true;$area.ShrinkToFit=$false
+ $area.VerticalAlignment=-4160
+ $last=$area.Rows.Item($area.Rows.Count)
+ $required=$height-[double]$area.Height+[double]$last.RowHeight
+ if($required -gt 409){throw 'Текст превышает высоту строки Excel. Разделите запись на несколько позиций.'}
+ if($required -gt $last.RowHeight){$last.RowHeight=$required}
+}

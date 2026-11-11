@@ -7,7 +7,7 @@ from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-VERSION=4
+VERSION=8
 MONTHS='января февраля марта апреля мая июня июля августа сентября октября ноября декабря'.split()
 DATE=re.compile(r'[«"“]?\s*\d{1,2}\s*[»"”]?\s*(?:[.\-/]\s*\d{1,2}\s*[.\-/]|(?:'+'|'.join(MONTHS)+r')\s*)\s*\d{4}\s*г?\.?',re.I)
 
@@ -84,10 +84,11 @@ def analyze_word(path,prepared=None):
     if kind=='unknown' and re.search(r'\bприказ\b',low) and 'приказываю' in low:kind='order'
     def add(key,label,parts,typ='text'):
         nonlocal counter
+        parts=[(i,0,len(texts[i])) if not texts[i].strip() else (i,a,b) for i,a,b in parts]
         parts=[(i,a,b) for i,a,b in parts if not calculated(paras[i]) and not any(
             j==i and (a<y and b>x or a==b==x==y) for j,x,y in claimed)]
-        if any(texts[i][a:b].strip() for i,a,b in parts):parts=[(i,a,b) for i,a,b in parts if texts[i][a:b].strip()]
-        elif len(parts)>1:parts=parts[:1]
+        if typ!='worddate' and any(texts[i][a:b].strip() for i,a,b in parts):parts=[(i,a,b) for i,a,b in parts if texts[i][a:b].strip()]
+        elif typ!='worddate' and len(parts)>1:parts=parts[:1]
         if not parts:return
         if key in fields:key=key+'_'+str(len(fields))
         samples=[texts[i][a:b] for i,a,b in parts];sample=' '.join(v.strip() for v in samples).strip()
@@ -160,8 +161,15 @@ def analyze_word(path,prepared=None):
                     continue
                 if s in ('№','"','«','»'):break
                 parts.append(whole(j))
+        note_tab=re.match(r'^\s*Дополнительные сведения *:? *(\t[ \t]*)',value,re.I) if key=='notes' else None
+        if note_tab:
+            parts=[(i,note_tab.start(1),len(value))]
         if not parts and key in ('notes','attachments'):parts=[(i,len(value),len(value))]
-        if parts:add(key,label,parts)
+        if parts:
+            add(key,label,parts)
+            if note_tab and key in fields:
+                fields[key]['segments'][0]['prefix']=' '
+                fields[key]['value']=fields[key]['value'].strip()
     # Inline entries retain their label and surrounding punctuation.
     for i,value in enumerate(texts):
         if i in registry_ps or caption(value):continue
@@ -175,8 +183,18 @@ def analyze_word(path,prepared=None):
         elif re.search(r'произвели осмотр работ, выполненных',value,re.I) and i+1<len(texts):
             j=next((j for j in range(i+1,min(i+5,len(texts))) if texts[j].strip()),None)
             if j is not None and not caption(texts[j]):add('executor','Исполнитель работ',[whole(j)])
-        m=re.search(r'Акт составлен в\s*(\d+)',value,re.I)
-        if m:add('copies','Количество экземпляров',[(i,m.start(1),m.end(1))])
+        m=re.search(r'Акт составлен в([ \t\u00a0_]*\d*[ \t\u00a0_]*)(?=(?:-[хти]+)?[ \t\u00a0]*экземпляр)',value,re.I)
+        if m:
+            content=m.group(1)
+            number=re.search(r'\d+',content)
+            if number:
+                a,b=m.start(1)+number.start(),m.start(1)+number.end()
+            else:
+                a,b=m.start(1),m.end(1)
+            add('copies','Количество экземпляров',[(i,a,b)])
+            if not number and 'copies' in fields:
+                fields['copies']['segments'][0].update(prefix=' ',suffix=' ')
+                fields['copies']['value']=''
         m=re.search(r'нагружением в размере\s*(\d+\s*%)',value,re.I)
         if m:add('loadPercent','Допустимая нагрузка',[(i,m.start(1),m.end(1))])
     def date_parts(i):
@@ -192,7 +210,10 @@ def analyze_word(path,prepared=None):
             if marker in v and key not in fields:
                 parts=date_parts(i+1)
                 if parts:add(key,label,parts,'worddate')
-        if re.search(r'Акт составлен в\s*$',v,re.I) and i+1<len(texts) and texts[i+1].strip().isdigit():add('copies','Количество экземпляров',[whole(i+1)])
+        if re.search(r'Акт составлен в\s*$',v,re.I) and i+1<len(texts):
+            next_value=texts[i+1].strip()
+            blank_slot=not next_value and i+2<len(texts) and texts[i+2].strip().lower().startswith('экземпляр')
+            if next_value.isdigit() or blank_slot:add('copies','Количество экземпляров',[whole(i+1)])
         if norm(v).startswith(('ассоциация','сро ')) and not any((i,a,b) in claimed for _,a,b in [whole(i)]):
             add('sro'+str(i),'СРО · реквизиты',[whole(i)])
     if kind=='act':
@@ -245,15 +266,10 @@ def analyze_word(path,prepared=None):
                 elif v.strip()=='Раздел' and i+1<len(texts):add('section'+str(1+sum(k.startswith('section') for k in fields)),'Раздел',[whole(i+1)])
     if kind=='order':
         for i,v in enumerate(texts):
-            m=re.match(r'^(\s*Приказ\s*№\s*)(.*)$',v,re.I)
-            if m:add('orderNumber','Номер приказа',[(i,m.start(2),len(v))])
             if DATE.fullmatch(v.strip()):add('orderDate','Дата приказа',[whole(i)],'worddate')
-            m=re.search(r'на\s+Объекте\s*:\s*(.+)',v,re.I)
-            if m:add('orderObject','Объект приказа',[(i,m.start(1),m.end(1))])
-            m=re.match(r'\s*Назначить\s+([^,\n]+)',v,re.I)
-            if m:add('orderAppointee','Назначаемое лицо · ФИО в форме документа',[(i,m.start(1),m.end(1))])
-            m=re.match(r'\s*(Генеральный директор|Производитель работ)\s{3,}(\S.*)',v,re.I)
-            if m:add('orderDirector' if m[1].lower().startswith('генеральный') else 'orderAcknowledged',m[1]+' · ФИО',[(i,m.start(2),m.end(2))])
+    from word_slots import supplement
+    font_sizes={i:max(map(float,p.xpath('./w:r/w:rPr/w:sz/@w:val')))/2 for i,p in enumerate(paras) if p.xpath('./w:r/w:rPr/w:sz/@w:val')} if kind=='order' else {}
+    supplement(kind,texts,fields,add,bool(d._element.xpath('.//w:drawing | .//w:pict')),font_sizes)
     from manual_fields import apply as apply_manual,revision as manual_revision
     from sample_forms import apply_word
     added_samples=apply_word(d,add,claimed,fields)
@@ -272,6 +288,7 @@ def analyze_word(path,prepared=None):
         order=['appendixNumber','actRef','refDate','refWork','regAddress','qualityNumber']+[k for k in fields if k.startswith('row')]+['compilerRole','compiler']
     else:order=[]
     fields={key:fields[key] for key in dict.fromkeys(order+list(fields)) if key in fields}
+    if 'copies' in fields:fields['copies']['kind']='number'
     # Unsupported values are not made editable merely because they contain text.
     if prepared:
         ids={node.get(qn('w:id')) for node in d._element.xpath('.//w:bookmarkStart') if node.get(qn('w:name'),'').startswith('BID_auto_')}

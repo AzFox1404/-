@@ -61,6 +61,7 @@ try{
  }
  $special=@{}
  if($FieldMap){$spec=Get-Content -LiteralPath $FieldMap -Raw -Encoding UTF8|ConvertFrom-Json;foreach($prop in $spec.psobject.Properties){if($excel -and $known -and $map.Contains($prop.Name)){continue};$special[$prop.Name]=$prop.Value;$fields[$prop.Name]=[string]$prop.Value.value}}
+ if($excel -and $special.ContainsKey('copies')){if(!(BoundCell 'BID_copies')){BindCell 'BID_copies' ($sheet.Range([string]$special['copies'].dest))}}
  $registerRepaired=$false
  if($excel -and $special.Keys -match '^row'){
   SetupRegisterPrint $sheet
@@ -118,20 +119,19 @@ try{
    }
    foreach($prop in $req.values.psobject.Properties){
     $k=$prop.Name;$v=[string]$prop.Value;if(!$fields.Contains($k) -or $v -ceq $last[$k]){continue}
+    if($k -eq 'copies' -and $v -and $v -notmatch '^[1-9][0-9]*$'){throw 'Количество экземпляров должно быть положительным целым числом.'}
     $cleanReady=$false
     if($special.ContainsKey($k)){
      $entry=$special[$k]
      if($excel){
-      $cell=$sheet.Range([string]$entry.dest)
+      $cell=if($k -eq 'copies'){BoundCell 'BID_copies'}else{$sheet.Range([string]$entry.dest)}
       if($k -match '^row\d+_'){$v=$v.Trim()}
-      if($entry.kind -eq 'datecell' -and $v){$day=[datetime]::ParseExact($v,'dd.MM.yyyy',[Globalization.CultureInfo]::InvariantCulture);$cell.GetType().InvokeMember("Value2",[Reflection.BindingFlags]::SetProperty,$null,$cell,@($day.ToOADate()))|Out-Null}
+      if($k -eq 'copies'){$cell.Value2=[string]$entry.prefix+$v+[string]$entry.suffix}
+      elseif($entry.kind -eq 'datecell' -and $v){$day=[datetime]::ParseExact($v,'dd.MM.yyyy',[Globalization.CultureInfo]::InvariantCulture);$cell.GetType().InvokeMember("Value2",[Reflection.BindingFlags]::SetProperty,$null,$cell,@($day.ToOADate()))|Out-Null}
       elseif($entry.kind -eq 'number' -and $v){$cell.GetType().InvokeMember("Value2",[Reflection.BindingFlags]::SetProperty,$null,$cell,@([double]::Parse($v)))|Out-Null}
-      elseif($entry.label -eq 'Страницы' -and $v -match '^\d+-\d+$'){$cell.Value2="'"+$v} else{$cell.Value2=[string]$entry.prefix+$v}
-      if($k -match '^row\d+_' -and $cell.WrapText -and !$cell.MergeCells){
-       $height=[double]$cell.RowHeight
-       [void]$cell.EntireRow.AutoFit()
-       if($cell.RowHeight -lt $height){$cell.RowHeight=$height}
-      }
+      elseif($entry.label -eq 'Страницы' -and $v -match '^\d+-\d+$'){$cell.Value2="'"+$v} else{$cell.Value2=[string]$entry.prefix+$v+[string]$entry.suffix}
+      if($entry.span){[void]$sheet.Range([string]$entry.span).Merge()}
+      if($entry.kind -eq 'text' -and $v){FitExcelText $cell}
      }elseif($entry.word){
       $display=$v
       if($k -in 'materials','attachments','schemes','project','hiddenWorks'){$display=[regex]::Replace($display,'(\b\d{2}\.\d{2}\.\d{4})(?!\d)(?!\s*г\.?)','$1 г.')}
@@ -143,7 +143,7 @@ try{
      $last[$k]=$v;continue
     }
     if($excel){
-     if($k -like 'ID_*'){$bindings[$k].Value2=$v}
+     if($k -like 'ID_*'){$bindings[$k].Value2=$v;FitExcelText $bindings[$k]}
      elseif($k -in 'start','end','date'){
       $cell=BoundCell (FieldName $k 0);if(!$cell){$cell=$sheet.Range($bindings[$k][0])};$sample=$original[$k]
       if(!$sample -or !(IsoDate $sample)){$sample='"01" января 2000г.'}
