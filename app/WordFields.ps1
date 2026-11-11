@@ -49,7 +49,7 @@
    $before=if($range.Start -gt $paragraphRange.Start){[string]$doc.Range($range.Start-1,$range.Start).Text}else{''}
    $after=if($range.End -lt $paragraphRange.End-1){[string]$doc.Range($range.End,$range.End+1).Text}else{''}
    if($replacement){
-    if($before -match '[\p{L}\p{N}:№)»]$'){$replacement=' '+$replacement}
+    if($before -match '[\p{L}\p{N}:)»]$'){$replacement=' '+$replacement}
     if($after -match '^[\p{L}\p{N}«№]'){$replacement+=' '}
    }elseif($before -and $after -match '^[\p{L}\p{N}«№]'){$replacement=' '}
   }

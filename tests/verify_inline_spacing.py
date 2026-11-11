@@ -15,14 +15,17 @@ with tempfile.TemporaryDirectory() as directory:
         assert 'regAddress' in fields
         if index:assert fields['regObject']['value']=='«Здание»' and fields['regAddress']['value']=='Старый адрес'
         mapping=root/'map.json';mapping.write_text(json.dumps(fields),encoding='utf-8')
-        values=dict(actRef='3487',refDate='13.04.2026',refWork='Монтаж',regAddress='г. Москва')
+        values=dict(actRef='3487',refDate='13.04.2026',refWork='Монтаж',regAddress='г. Москва',qualityNumber='23')
         requests=[]
         for revision,update in enumerate((values,{k:'' for k in values},values)):
             requests.append(json.dumps(dict(values=update,pdf=str(root/f'{index}-{revision}.pdf'))))
         result=subprocess.run(['powershell.exe','-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',str(APP_DIR/'PreviewWorker.ps1'),'-WorkFile',str(prepared),'-FieldMap',str(mapping)],input='\n'.join(requests)+'\n',capture_output=True,encoding='utf-8',timeout=120,creationflags=subprocess.CREATE_NO_WINDOW)
         messages=[json.loads(line.lstrip('\ufeff')) for line in result.stdout.splitlines() if line.strip()]
         assert result.returncode==0 and not any('error' in m for m in messages),(result.stderr,messages)
-        printed=Document(prepared).paragraphs[1].text
+        saved=Document(prepared)
+        assert saved.paragraphs[0].text=='Реестр документов качества №23',repr(saved.paragraphs[0].text)
+        printed=saved.paragraphs[1].text
+        if index:assert '№3487 от' in printed,repr(printed)
         assert '  ' not in printed and '\u00a0' not in printed,repr(printed)
         assert '3487 от 13.04.2026 освидетельствования' in printed,repr(printed)
         assert 'по адресу: г. Москва' in printed,repr(printed)

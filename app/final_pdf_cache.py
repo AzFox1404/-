@@ -7,7 +7,7 @@ from zipfile import ZipFile,BadZipFile
 from pypdf.errors import PdfReadError
 from app_paths import DATA_DIR
 
-POLICY='bureau-office-clean-v7'
+POLICY='bureau-office-clean-v8'
 
 def digest(path):
     h=hashlib.sha256()
