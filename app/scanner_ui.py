@@ -84,17 +84,35 @@ def scanner(app,files=None,destination=None):
             ttk.Label(left,text=label).pack(anchor='w',padx=8)
             v=tk.StringVar();vars[key]=v
             (ttk.Combobox(left,values=TYPES,textvariable=v) if key=='type' else ttk.Entry(left,textvariable=v)).pack(fill='x',padx=8,pady=2)
+        def remainder(record,start,end):
+            return dict(record,start=start,end=end,type='Документ',number='',date='',material='',rotations=dict(record.get('rotations',{})))
         def commit():
-            r=records[state[0]];updated={k:v.get().strip() for k,v in vars.items()}
+            idx=state[0];r=records[idx];updated={k:v.get().strip() for k,v in vars.items()}
             updated['start']=int(updated['start']);updated['end']=int(updated['end'])
             if not 1<=updated['start']<=updated['end']<=len(r['pages']) or not updated['type']:raise ValueError('Проверьте название и диапазон страниц.')
+            if not r['start']<=updated['start']<=updated['end']<=r['end']:
+                raise ValueError(f"Выберите диапазон внутри страниц {r['start']}–{r['end']}. Чтобы добавить соседние страницы, объедините документы.")
             if updated['date']:
                 from datetime import datetime
                 datetime.strptime(updated['date'],'%d.%m.%Y')
+            # Validate everything before changing the partition or its metadata.
+            rotations=dict(r.get('rotations',{}))
             if preview.page_range is not None:
                 offset=preview.page_range[0]
-                r.setdefault('rotations',{}).update({str(int(n)+offset):angle for n,angle in preview.rotations.items()})
+                rotations.update({str(int(n)+offset):angle for n,angle in preview.rotations.items()})
+            updated['rotations']=rotations
+            old_start,old_end=r['start'],r['end']
+            changed=(old_start,old_end)!=(updated['start'],updated['end'])
+            before=[remainder(r,old_start,updated['start']-1)] if updated['start']>old_start else []
+            after=[remainder(r,updated['end']+1,old_end)] if updated['end']<old_end else []
+            for part in before+after:part['rotations']=dict(rotations)
             r.update(updated)
+            if changed:
+                records[idx:idx+1]=before+[r]+after
+                state[0]=idx+len(before)
+                render()
+            refresh()
+            return changed
         def load(n):
             state[0]=n;r=records[n]
             for k,v in vars.items():v.set(str(r[k]))
@@ -106,7 +124,9 @@ def scanner(app,files=None,destination=None):
         def pick(e):
             if not lb.curselection():return
             if lb.curselection()[0]==state[0]:return
-            try:commit();load(lb.curselection()[0])
+            target=records[lb.curselection()[0]]
+            try:
+                commit();load(next(i for i,r in enumerate(records) if r is target));refresh()
             except Exception as exc:messagebox.showerror('Карточка',str(exc));refresh()
         lb.bind('<<ListboxSelect>>',pick)
         def navigate(step):
@@ -132,7 +152,11 @@ def scanner(app,files=None,destination=None):
 
         def split():
             try:
-                commit();idx=state[0];r=records[idx]
+                if commit():
+                    r=records[state[0]]
+                    status.set(f"Выделен документ: страницы {r['start']}–{r['end']}. Реквизиты сохранены в карточке, оставшиеся страницы — в отдельных записях списка.")
+                    return
+                idx=state[0];r=records[idx]
                 if preview.page_range!=(r['start']-1,r['end']):
                     render();status.set('Диапазон обновлён. Выберите страницу разделения в предпросмотре.');return
                 n=preview.page_range[0]+preview.current_page()+1
@@ -140,7 +164,7 @@ def scanner(app,files=None,destination=None):
                     load(idx);refresh()
                     status.set(f'Страница {n} уже является началом этого документа. Для разделения выберите следующую страницу внутри него или другую запись списка.')
                     return
-                part=dict(r,start=n,type='Документ',number='',date='',material='');r['end']=n-1
+                part=remainder(r,n,r['end']);r['end']=n-1
                 records.insert(idx+1,part);load(idx);refresh()
                 status.set(f"Отделён документ: страницы {r['start']}–{r['end']}. Остаток {part['start']}–{part['end']} — в следующей записи списка.")
             except Exception as exc:messagebox.showerror('Разделение',str(exc))
@@ -148,6 +172,7 @@ def scanner(app,files=None,destination=None):
             try:
                 commit();idx=state[0];r=records[idx];other=records[idx+1]
                 if other['path']!=r['path']:raise ValueError('Это разные исходные файлы.')
+                r.setdefault('rotations',{}).update(other.get('rotations',{}))
                 r['end']=other['end'];records.pop(idx+1);load(idx);refresh()
             except (ValueError,IndexError) as exc:messagebox.showerror('Объединение',str(exc))
         saving=[False]
