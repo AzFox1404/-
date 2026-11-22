@@ -36,7 +36,7 @@ with tempfile.TemporaryDirectory() as td:
  c.drawString(45,530,'Сертификат качества № 869');c.drawString(45,490,'Дата 14.01.2024');c.save()
  im=Image.new('RGB',(1800,1800),'white');d=ImageDraw.Draw(im);font=ImageFont.truetype('C:/Windows/Fonts/arial.ttf',70)
  d.text((120,180),'Сертификат качества № 869',font=font,fill='black');d.text((120,300),'Дата выдачи 14.01.2024',font=font,fill='black');im.save(folder/'scan.png')
- c=canvas.Canvas(str(scan),pagesize=(600,600));c.drawImage(str(folder/'scan.png'),0,0,600,600);c.save()
+ c=canvas.Canvas(str(scan),pagesize=(600,600));c.drawString(40,530,'Wrong source page 12345');c.showPage();c.drawImage(str(folder/'scan.png'),0,0,600,600);c.save()
  studio.STORE=folder/'store';studio.PROJECTS=studio.STORE/'Проекты';studio.LIB=studio.STORE/'Библиотека'/'Шаблоны'
  root=tk.Tk();app=studio.Studio(root);errors=[]
  root.report_callback_exception=lambda *e:(errors.append(str(e[1])),__import__('traceback').print_exception(*e))
@@ -52,7 +52,8 @@ with tempfile.TemporaryDirectory() as td:
  # Character boxes follow actual page rotation, not an unrotated text overlay.
  for angle in (90,90,90,90):
   v.rotate(angle);pump(root);choose(v,'869')
- v.show(scan,0);wait_pdf(root,v);pump(root)
+ v.show(scan,0,page_range=(1,2));wait_pdf(root,v);pump(root)
+ assert len(v.pages)==1 and v.selection.page_offset==1
  v.canvas.event_generate('<Button-1>',x=100,y=80);pump(root)
  until=time.monotonic()+45
  while v.selection.pending and time.monotonic()<until:pump(root,.1)

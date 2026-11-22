@@ -76,7 +76,10 @@ def scanner(app,files=None,destination=None):
 
         def render():
             record=records[state[0]]
-            preview.show(record['path'],record['start']-1,record.setdefault('rotations',{}))
+            offset=record['start']-1
+            rotations={str(n-offset):angle for key,angle in record.setdefault('rotations',{}).items()
+                       if offset<=(n:=int(key))<record['end']}
+            preview.show(record['path'],0,rotations,page_range=(offset,record['end']))
         for key,label in [('start','С первой страницы'),('end','По страницу'),('type','Название документа'),('number','Номер'),('date','Дата документа'),('material','Материал')]:
             ttk.Label(left,text=label).pack(anchor='w',padx=8)
             v=tk.StringVar();vars[key]=v
@@ -88,6 +91,9 @@ def scanner(app,files=None,destination=None):
             if updated['date']:
                 from datetime import datetime
                 datetime.strptime(updated['date'],'%d.%m.%Y')
+            if preview.page_range is not None:
+                offset=preview.page_range[0]
+                r.setdefault('rotations',{}).update({str(int(n)+offset):angle for n,angle in preview.rotations.items()})
             r.update(updated)
         def load(n):
             state[0]=n;r=records[n]
@@ -126,19 +132,17 @@ def scanner(app,files=None,destination=None):
 
         def split():
             try:
-                commit();n=preview.current_page()+1;path=records[state[0]]['path']
-                # The continuous preview covers the source PDF, including pages
-                # already assigned to neighbouring recognized documents.
-                idx=next((i for i,r in enumerate(records) if r['path']==path and r['start']<=n<=r['end']),None)
-                if idx is None:raise ValueError('Текущая страница не входит в диапазоны документов. Проверьте границы страниц.')
-                r=records[idx]
+                commit();idx=state[0];r=records[idx]
+                if preview.page_range!=(r['start']-1,r['end']):
+                    render();status.set('Диапазон обновлён. Выберите страницу разделения в предпросмотре.');return
+                n=preview.page_range[0]+preview.current_page()+1
                 if n==r['start']:
                     load(idx);refresh()
-                    status.set(f'Страница {n} уже является началом отдельного документа. Для нового разделения прокрутите до следующей нужной страницы.')
+                    status.set(f'Страница {n} уже является началом этого документа. Для разделения выберите следующую страницу внутри него или другую запись списка.')
                     return
                 part=dict(r,start=n,type='Документ',number='',date='',material='');r['end']=n-1
-                records.insert(idx+1,part);load(idx+1);refresh()
-                status.set(f'Документ разделён перед страницей {n}. Проверьте реквизиты нового документа и сохраните результат.')
+                records.insert(idx+1,part);load(idx);refresh()
+                status.set(f"Отделён документ: страницы {r['start']}–{r['end']}. Остаток {part['start']}–{part['end']} — в следующей записи списка.")
             except Exception as exc:messagebox.showerror('Разделение',str(exc))
         def merge():
             try:

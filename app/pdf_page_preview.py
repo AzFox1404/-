@@ -15,6 +15,7 @@ class PagePreview(ttk.Frame):
         super().__init__(parent)
         self.app=app;self.path=None;self.number=0;self.rotations={};self.zoom=70;self.image=None
         self.page_tracking=page_tracking
+        self.page_range=None
         self.pages=[];self.images={};self._pending=None;self._sizes=None;self._zoom_job=None;self._wanted_zoom=None;self._text_cache={}
         self._bitmap_cache=OrderedDict();self._bitmap_bytes=0
         self._zoom_frame=None;self._interactive_zoom=False
@@ -125,14 +126,16 @@ class PagePreview(ttk.Frame):
         self.page_text.set(f'{self.number+1} / {len(self.pages)}')
         self.image=self.images.get(self.number)
 
-    def show(self,path,number,rotations=None,retain=False):
+    def show(self,path,number,rotations=None,retain=False,page_range=None):
         source=path if isinstance(path,bytes) else Path(path)
-        same=source==self.path and (rotations or {})==self.rotations and bool(self.pages)
+        page_range=tuple(page_range) if page_range is not None else None
+        same=source==self.path and page_range==self.page_range and (rotations or {})==self.rotations and bool(self.pages)
         if same:
             if self.number!=number:self.go_to(number)
             return
         self.cancel_zoom()
-        changed=source!=self.path
+        changed=source!=self.path or page_range!=self.page_range
+        self.page_range=page_range
         self.path=source;self.number=number;self.rotations=rotations if rotations is not None else {}
         if changed:
             self._retain_update=retain
@@ -151,8 +154,8 @@ class PagePreview(ttk.Frame):
             self._sizes=None;self._text_cache.clear();self._bitmap_cache.clear();self._bitmap_bytes=0
             self._generation+=1
             if not retain:self.pages=[];self.images.clear();self.canvas.delete('all')
-            self.selection.reset(source)
-            self.page_text.set("Загрузка PDF…");self.renderer.open(source,self._generation)
+            self.selection.reset(source,page_offset=page_range[0] if page_range else 0)
+            self.page_text.set("Загрузка PDF…");self.renderer.open(source,self._generation,page_range=page_range)
         else:self.render()
 
     def zoom_at(self,event):
@@ -260,7 +263,7 @@ class PagePreview(ttk.Frame):
                 text_key=(n,data['rotation']);self._text_cache[text_key]=data['chars']
                 for key,(photo,chars) in list(self._bitmap_cache.items()):
                     if (key[0],key[2])==text_key:self._bitmap_cache[key]=(photo,data['chars'])
-        self.selection.reset(self.path)
+        self.selection.reset(self.path,page_offset=self.page_range[0] if self.page_range else 0)
         self.canvas.yview_moveto((self.pages[self.number][0]-8)/self.height)
         if not defer:self.render_visible()
 

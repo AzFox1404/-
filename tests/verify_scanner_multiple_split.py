@@ -1,4 +1,4 @@
-"""Split a continuous 13-page source and save independent certificate cards."""
+"""Each scanner card previews and saves only its own source-page range."""
 import hashlib
 import tempfile
 import time
@@ -80,21 +80,28 @@ with tempfile.TemporaryDirectory() as directory:
                 widget = entry(label)
                 widget.delete(0, 'end')
                 widget.insert(0, value)
-        fill(1)
-        for page in range(2, 14):
-            # Like the screenshot: the preceding page remains at the top,
-            # while the next certificate occupies most of the visible area.
-            top = preview.pages[page-1][0]-160
-            preview.canvas.yview_moveto(top/preview.height)
-            if page != 3:
-                pump(root)
-            # Page 3 is split immediately, before the delayed preview refresh.
-            invoke('Разделить перед текущей страницей')
-            assert listing.curselection() == (page-1,), (page, listing.curselection())
-            assert entry('С первой страницы').get() == str(page)
-            if page not in (6, 7, 10):
+        for page in range(1, 14):
+            index=next(i for i,r in enumerate(records) if r['start']<=page<=r['end'])
+            listing.selection_clear(0,'end');listing.selection_set(index);listing.event_generate('<<ListboxSelect>>')
+            pump(root);wait_pdf(root,preview)
+            end=records[index]['end']
+            assert preview.page_range==(page-1,end) and len(preview.pages)==end-page+1
+            if page not in (1, 6, 7, 10):
                 assert entry('Номер').get() == '', (page, entry('Номер').get())
             fill(page)
+            if end>page:
+                # Keep the previous page's tail visible at the split boundary.
+                preview.canvas.yview_moveto((preview.pages[1][0]-160)/preview.height)
+                if page!=2:pump(root)
+                invoke('Разделить перед текущей страницей')
+                wait_pdf(root,preview)
+                # The detached upper card stays selected; the remainder is below it.
+                assert listing.curselection()==(index,)
+                assert (records[index]['start'],records[index]['end'])==(page,page)
+                assert (records[index+1]['start'],records[index+1]['end'])==(page+1,end)
+                assert len(preview.pages)==1 and preview.page_range==(page-1,page)
+                text=''.join(c for item in preview.selection.pages.values() for c,_ in item['chars'])
+                assert f'CERTIFICATE PAGE {page}\n' in text and f'CERTIFICATE PAGE {page+1}\n' not in text,repr(text)
         assert [(r['start'], r['end']) for r in records] == [(n, n) for n in range(1, 14)]
         invoke('Сохранить отмеченные документы отдельными PDF')
         end = time.monotonic()+15
@@ -114,4 +121,4 @@ with tempfile.TemporaryDirectory() as directory:
     finally:
         root.destroy()
 
-print('PASS 13-page continuous split, independent metadata, 13 exact PDFs and unchanged source')
+print('PASS 1+4 page preview after split, independent cards, 13 exact PDFs and unchanged source')

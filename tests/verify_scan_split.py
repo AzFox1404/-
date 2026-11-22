@@ -34,20 +34,37 @@ with tempfile.TemporaryDirectory() as td:
  buttons={aliases.get(w.hint_message,w.hint_message):SimpleNamespace(invoke=lambda item=w:invoke_icon(item)) for w in widgets(win) if isinstance(getattr(w,'hint_message',None),str)}
  wait_pdf(root,preview)
  split=buttons['Разделить с текущей страницы'];preview.set_zoom(120);pump(root)
- # Exact screenshot: record 3-4, currently on its first page 3.
+ # The second card shows only source pages 3-4, numbered locally 1-2.
  lb.selection_clear(0,'end');lb.selection_set(1);lb.event_generate('<<ListboxSelect>>');pump(root)
- assert preview.number==2
+ wait_pdf(root,preview)
+ assert preview.number==0 and len(preview.pages)==2 and preview.page_range==(2,4)
  split.invoke();pump(root)
  assert not dialogs,dialogs
  assert [(r['start'],r['end']) for r in records]==[(1,2),(3,4)]
  assert records[1]['number']=='869' and list(lb.curselection())==[1]
- # Continuous scroll into another record must split that record, without overlaps.
+ # Scrolling to the end cannot expose pages assigned to the other card.
  lb.selection_clear(0,'end');lb.selection_set(0);lb.event_generate('<<ListboxSelect>>');pump(root)
- preview.go_to(3);pump(root);assert preview.number==3
+ wait_pdf(root,preview)
+ preview.go_to(99);pump(root);assert preview.number==1 and len(preview.pages)==2
+ lb.selection_clear(0,'end');lb.selection_set(1);lb.event_generate('<<ListboxSelect>>');pump(root)
+ wait_pdf(root,preview)
+ preview.go_to(1);pump(root)
+ # Rotation uses the original source page even though the preview index is local.
+ preview.rotate(90);pump(root)
  split.invoke();pump(root)
  assert [(r['start'],r['end']) for r in records]==[(1,2),(3,3),(4,4)]
  assert records[1]['number']=='869' and records[2]['number']==''
+ wait_pdf(root,preview)
+ assert lb.curselection()==(1,) and len(preview.pages)==1 and preview.page_range==(2,3)
+ # Recombine and split again: preview geometry must follow both operations.
+ buttons['Объединить со следующим документом'].invoke();pump(root);wait_pdf(root,preview)
+ assert [(r['start'],r['end']) for r in records]==[(1,2),(3,4)] and len(preview.pages)==2
+ preview.go_to(1);pump(root);split.invoke();pump(root);wait_pdf(root,preview)
+ assert len(preview.pages)==1 and preview.page_range==(2,3)
  split.invoke();pump(root);assert len(records)==3 and not dialogs
+ lb.selection_clear(0,'end');lb.selection_set(2);lb.event_generate('<<ListboxSelect>>');pump(root);wait_pdf(root,preview)
+ assert preview.page_range==(3,4) and preview.selection.page_offset==3 and preview.rotations.get('0')==90
+ assert preview.pages[0][1]>preview.pages[0][2]
  buttons['Подтвердить и сохранить'].invoke();pump(root)
  assert not dialogs,dialogs
  end=time.monotonic()+10
@@ -56,6 +73,7 @@ with tempfile.TemporaryDirectory() as td:
  output,meta=saved[0]
  assert [len(PdfReader(output/r['file']).pages) for r in meta]==[2,1,1]
  assert sum(len(PdfReader(output/r['file']).pages) for r in meta)==4
+ assert [PdfReader(output/r['file']).pages[0].rotation for r in meta]==[0,0,90]
  assert not errors,errors
  app.close()
- print('PASS existing boundary is harmless; cross-record scroll split; repeat click; saved 2+1+1 pages without loss/duplication',flush=True)
+ print('PASS record-only preview, split/merge geometry, repeat click; saved 2+1+1 pages without loss/duplication',flush=True)

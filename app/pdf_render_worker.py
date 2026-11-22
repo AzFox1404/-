@@ -17,13 +17,18 @@ def run():
      from pathlib import Path
      source=Path(source).read_bytes()
     doc=fitz.open(stream=source,filetype='pdf')
-    result=dict(op='open',generation=req['generation'],sizes=[tuple(doc[n].rect)[2:] for n in range(len(doc))])
+    bounds=req.get('page_range')
+    if bounds is not None and not 0<=bounds[0]<bounds[1]<=len(doc):raise ValueError('Неверный диапазон страниц предпросмотра.')
+    page_numbers=range(*bounds) if bounds is not None else range(len(doc))
+    result=dict(op='open',generation=req['generation'],sizes=[tuple(doc[n].rect)[2:] for n in page_numbers])
    elif req['op']=='locate':
     from fast_preview import locate
-    result=dict(op='locate',generation=req['generation'],anchors=locate(doc,req['values']))
+    anchors=locate(doc,req['values']);indices={source:n for n,source in enumerate(page_numbers)}
+    anchors={key:{**value,'page':indices[value['page']]} for key,value in anchors.items() if value['page'] in indices}
+    result=dict(op='locate',generation=req['generation'],anchors=anchors)
    else:
     started=time.perf_counter()
-    page=doc[req['page']];page.set_rotation((page.rotation+req['rotation'])%360)
+    page=doc[page_numbers[req['page']]];page.set_rotation((page.rotation+req['rotation'])%360)
     try:
      key=(req['page'],req['rotation'])
      if key not in lists:lists[key]=page.get_displaylist()

@@ -27,7 +27,7 @@ python tools/check_project.py
 | PDF-масштаб без ожидания точных плиток | `verify_pdf_zoom.py` — синтетический А0 по умолчанию; BUREAU_ID_ZOOM_SAMPLE — один локальный образец (читается в временную копию), BUREAU_ID_ZOOM_BASELINE — необязательный старый pdf_page_preview.py для сравнения. История Git для обычной регрессии не нужна |
 | Символы, повороты, OCR, вставка | `verify_pdf_selection.py` (Windows OCR, временные синтетические документы) |
 | Запуск/рамка/изолированный анализ | `verify_window_lifecycle.py`, `verify_passport_process.py`, `verify_project_scan_lifecycle.py` — только синтетические временные проекты; настоящий PDF/JPEG OCR и авария дочернего процесса |
-| Сканер/разделение | `verify_scan_checklist.py`, `verify_scan_split.py`, `verify_scanner_multiple_split.py` — 13 страниц, видимый хвост предыдущего листа, независимые реквизиты и отдельные PDF |
+| Сканер/разделение | `verify_scan_checklist.py`, `verify_scan_split.py` — просмотр диапазона, разделение/объединение и поворот; `verify_scanner_multiple_split.py` — просмотр 1+4, 13 страниц, независимые реквизиты и отдельные PDF; `verify_pdf_selection.py` — OCR с учётом смещения диапазона |
 | Нижняя панель ОС / подсказки | `verify_taskbar_hints.py` (виртуальные координаты; без движения мыши пользователя) |
 | Ленты/вспомогательные окна | `verify_utility_controls.py` |
 | Общие диалоги/главная и подсчёт строк | `verify_app_dialogs.py` (Tk), `verify_counted_rows.py` (сгенерированные Excel/Word, Office) |

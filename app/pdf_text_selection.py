@@ -14,7 +14,7 @@ OCR_LOCK=threading.Lock()
 
 class PDFTextSelection:
     def __init__(self,canvas,app):
-        self.canvas=canvas;self.app=app;self.pages={};self.source=None
+        self.canvas=canvas;self.app=app;self.pages={};self.source=None;self.page_offset=0
         self.anchor=None;self.end=None;self.text='';self.generation=0
         self.results=queue.Queue();self.pending=set();self.timer=None
         self.message=tk.StringVar(master=canvas,value='Выделите текст мышью · Ctrl+C — копировать')
@@ -30,8 +30,8 @@ class PDFTextSelection:
             self.generation+=1
             if self.timer is not None:self.canvas.after_cancel(self.timer);self.timer=None
 
-    def reset(self,source):
-        self.generation+=1;self.source=source;self.pages={};self.pending=set();self.clear()
+    def reset(self,source,page_offset=0):
+        self.generation+=1;self.source=source;self.page_offset=page_offset;self.pages={};self.pending=set();self.clear()
 
     def clear(self,event=None):
         self.anchor=None;self.end=None;self.forced_range=None;self.text='';self.canvas.delete('pdf-selection')
@@ -156,13 +156,14 @@ class PDFTextSelection:
             if isinstance(self.source,(str,Path)):
                 path=Path(self.source);identity=f'{path.resolve()}:{path.stat().st_mtime_ns}:{path.stat().st_size}'
             else:identity=hashlib.sha256(self.source).hexdigest()
-            digest=hashlib.sha256(f'{identity}:{n}:{p["rotation"]}:selection-v1'.encode()).hexdigest()
+            source_page=n+self.page_offset
+            digest=hashlib.sha256(f'{identity}:{source_page}:{p["rotation"]}:selection-v1'.encode()).hexdigest()
             cache=Path(self.app.catalog_dir)/'Кэш выделения текста'/(digest+'.json')
             if cache.exists():
                 self.apply_ocr(n,json.loads(cache.read_text('utf-8')));return
             doc=pdfium.PdfDocument(self.source)
             try:
-                page=doc[n]
+                page=doc[source_page]
                 try:
                     bmp=page.render(scale=min(2.6,2400/max(page.get_size())),rotation=p['rotation'])
                     try:image=bmp.to_pil().copy()

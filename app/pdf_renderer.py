@@ -9,8 +9,8 @@ class PDFRenderer:
   from collections import deque
   self.timings=deque(maxlen=128)
   self.thread=threading.Thread(target=self.work,daemon=True);self.thread.start()
- def open(self,source,generation):
-  self.generation=generation;self.jobs.put(dict(op='open',source=source if isinstance(source,bytes) else str(source),generation=generation))
+ def open(self,source,generation,page_range=None):
+  self.generation=generation;self.jobs.put(dict(op='open',source=source if isinstance(source,bytes) else str(source),generation=generation,page_range=page_range))
  def set_epoch(self,epoch):
   from collections import deque
   self.epoch=epoch
