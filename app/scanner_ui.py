@@ -64,7 +64,7 @@ def scanner(app,files=None,destination=None):
         lb.grid(row=0,column=0,sticky='nsew');list_y.grid(row=0,column=1,sticky='ns');list_x.grid(row=1,column=0,sticky='ew')
         from pdf_page_preview import PagePreview
         state=[0];vars={}
-        preview=PagePreview(right,app);preview.pack(fill='both',expand=True)
+        preview=PagePreview(right,app,page_tracking='visible');preview.pack(fill='both',expand=True)
         def keep_tools_visible(e=None):
             def clamp():
                 if not content.winfo_exists():return
@@ -126,7 +126,7 @@ def scanner(app,files=None,destination=None):
 
         def split():
             try:
-                commit();n=preview.number+1;path=records[state[0]]['path']
+                commit();n=preview.current_page()+1;path=records[state[0]]['path']
                 # The continuous preview covers the source PDF, including pages
                 # already assigned to neighbouring recognized documents.
                 idx=next((i for i,r in enumerate(records) if r['path']==path and r['start']<=n<=r['end']),None)

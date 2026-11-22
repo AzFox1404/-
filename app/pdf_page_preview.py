@@ -11,9 +11,10 @@ from pdf_renderer import PDFRenderer
 
 
 class PagePreview(ttk.Frame):
-    def __init__(self,parent,app,wheel_zoom=False):
+    def __init__(self,parent,app,wheel_zoom=False,page_tracking='top'):
         super().__init__(parent)
         self.app=app;self.path=None;self.number=0;self.rotations={};self.zoom=70;self.image=None
+        self.page_tracking=page_tracking
         self.pages=[];self.images={};self._pending=None;self._sizes=None;self._zoom_job=None;self._wanted_zoom=None;self._text_cache={}
         self._bitmap_cache=OrderedDict();self._bitmap_bytes=0
         self._zoom_frame=None;self._interactive_zoom=False
@@ -109,6 +110,16 @@ class PagePreview(ttk.Frame):
 
     def page_at(self,y):
         return max(0,min(len(self.pages)-1,bisect_right(self.starts,y)-1))
+
+    def current_page(self):
+        if not self.pages:return self.number
+        top=self.canvas.canvasy(0);bottom=top+max(1,self.canvas.winfo_height())
+        if self.page_tracking=='visible':
+            # A small tail of the previous sheet must not take the split/rotate
+            # action away from the certificate occupying most of the viewport.
+            candidates=range(self.page_at(top),self.page_at(bottom)+1)
+            return max(candidates,key=lambda n:max(0,min(bottom,self.pages[n][0]+self.pages[n][2])-max(top,self.pages[n][0])))
+        return self.page_at(top+min(80,max(0,bottom-top-1)))
 
     def update_label(self):
         self.page_text.set(f'{self.number+1} / {len(self.pages)}')
@@ -267,7 +278,8 @@ class PagePreview(ttk.Frame):
             self.canvas.delete('image'+str(n));del self.images[n]
         self.tiles.update(visible,draft=self._interactive_zoom)
         if self._interactive_zoom:
-            self.number=self.page_at(top);self.update_label();self.rulers.draw();self.draw_quick();return
+            self.number=self.current_page() if self.page_tracking=='visible' else self.page_at(top)
+            self.update_label();self.rulers.draw();self.draw_quick();return
         missing={n for n in visible-set(self.images) if not self.tiles.large(n)}
         for n in sorted(missing):
             key=(n,self.zoom,self.rotations.get(str(n),0))
@@ -284,11 +296,11 @@ class PagePreview(ttk.Frame):
             if token not in self._requested:
                 self._requested.add(token)
                 self.renderer.page(self._generation,self._epoch,n,self.zoom,self.rotations.get(str(n),0))
-        # The page containing the upper visible part is the current page for splitting/rotation.
+        # The scanner tracks the largest visible sheet; the editor retains its top-page rule.
         while len(self._text_cache)>16:self._text_cache.pop(next(iter(self._text_cache)))
         for n in list(self.selection.pages):
             if n not in visible and not any(k[0]==n for k in self._text_cache):self.selection.pages.pop(n,None)
-        self.number=self.page_at(top+min(80,max(0,bottom-top-1)))
+        self.number=self.current_page()
         self.update_label()
         self.rulers.draw()
         self.selection.highlight()
