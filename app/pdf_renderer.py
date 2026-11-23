@@ -1,5 +1,5 @@
 """Nonblocking front end to one isolated, persistent renderer process."""
-import queue,threading,subprocess,pickle,sys,time
+import queue,threading,subprocess,pickle,sys,time,tempfile
 from pathlib import Path
 
 class PDFRenderer:
@@ -38,26 +38,52 @@ class PDFRenderer:
    try:p.terminate()
    except OSError:pass
  def work(self):
+  diagnostics=None
+  def stop():
+   nonlocal diagnostics
+   code=None;detail=''
+   p=self.process
+   if p:
+    if p.poll() is None:p.terminate()
+    try:p.wait(timeout=2)
+    except subprocess.TimeoutExpired:p.kill();p.wait(timeout=2)
+    code=p.returncode
+    for stream in (p.stdin,p.stdout):
+     if stream:
+      try:stream.close()
+      except OSError:pass  # A dead child can leave an unflushable stdin buffer.
+    self.process=None
+   if diagnostics:
+    diagnostics.seek(0,2);size=diagnostics.tell();diagnostics.seek(max(0,size-8192))
+    detail=diagnostics.read().decode('utf-8',errors='replace').strip()
+    diagnostics.close();diagnostics=None
+   return code,detail
   try:
-   p=subprocess.Popen([sys.executable,'-u',str(Path(__file__).with_name('pdf_render_worker.py'))],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,creationflags=subprocess.CREATE_NO_WINDOW)
-   self.process=p
-   if self.closed:p.terminate();return
    while not self.closed:
     job=self.jobs.get()
     if job is None:break
     if job['generation']!=self.generation or job['op']=='page' and not job.get('overview') and job['epoch']!=self.epoch:continue
-    self.active_tile=(job['page'],job['zoom'],job['rotation'],*job['tile']) if 'tile' in job else None
-    started=time.perf_counter()
-    pickle.dump(job,p.stdin,protocol=5);p.stdin.flush();result=pickle.load(p.stdout);self.active_tile=None
-    if 'render_ms' in result:
-     self.timings.append(dict(op=result['op'],render_ms=result['render_ms'],roundtrip_ms=round((time.perf_counter()-started)*1000,2)))
-    if job['op']=='page':self.render_count+=1
-    if job['generation']==self.generation and (job['op']!='page' or job.get('overview') or job['epoch']==self.epoch):self.results.put(result)
-  except (OSError,EOFError,BrokenPipeError) as exc:
-   if not self.closed:self.results.put(dict(op='error',generation=self.generation,error='Просмотр PDF: '+str(exc)))
+    if self.process is None and job['op']!='open':continue
+    try:
+     if self.process is None:
+      diagnostics=tempfile.TemporaryFile()
+      self.process=subprocess.Popen([sys.executable,'-u',str(Path(__file__).with_name('pdf_render_worker.py'))],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=diagnostics,creationflags=subprocess.CREATE_NO_WINDOW)
+     p=self.process
+     if self.closed:break
+     self.active_tile=(job['page'],job['zoom'],job['rotation'],*job['tile']) if 'tile' in job else None
+     started=time.perf_counter()
+     pickle.dump(job,p.stdin,protocol=5);p.stdin.flush();result=pickle.load(p.stdout);self.active_tile=None
+     if 'render_ms' in result:
+      self.timings.append(dict(op=result['op'],render_ms=result['render_ms'],roundtrip_ms=round((time.perf_counter()-started)*1000,2)))
+     if job['op']=='page':self.render_count+=1
+     if job['generation']==self.generation and (job['op']!='page' or job.get('overview') or job['epoch']==self.epoch):self.results.put(result)
+    except (OSError,EOFError,pickle.UnpicklingError) as exc:
+     code,detail=stop();self.active_tile=None
+     if "No module named 'pymupdf'" in detail:
+      message='Не установлен PyMuPDF в среде запуска приложения. Установите зависимости из requirements.txt и перезапустите приложение.'
+     else:
+      reason=detail.splitlines()[-1] if detail else str(exc)
+      message=f'Процесс предпросмотра PDF завершился (код {code}). {reason}'
+     if not self.closed:self.results.put(dict(op='error',generation=job['generation'],error=message))
   finally:
-   if self.process:
-    for stream in (self.process.stdin,self.process.stdout):
-     if stream:stream.close()
-    if self.process.poll() is None:self.process.terminate()
-    self.process.wait()
+   stop()

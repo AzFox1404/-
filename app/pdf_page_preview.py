@@ -129,12 +129,13 @@ class PagePreview(ttk.Frame):
     def show(self,path,number,rotations=None,retain=False,page_range=None):
         source=path if isinstance(path,bytes) else Path(path)
         page_range=tuple(page_range) if page_range is not None else None
-        same=source==self.path and page_range==self.page_range and (rotations or {})==self.rotations and bool(self.pages)
+        same=source==self.path and page_range==self.page_range and (rotations or {})==self.rotations and bool(self.pages) and not getattr(self,'_load_failed',False)
         if same:
             if self.number!=number:self.go_to(number)
             return
         self.cancel_zoom()
-        changed=source!=self.path or page_range!=self.page_range
+        changed=source!=self.path or page_range!=self.page_range or getattr(self,'_load_failed',False)
+        self._load_failed=False
         self.page_range=page_range
         self.path=source;self.number=number;self.rotations=rotations if rotations is not None else {}
         if changed:
@@ -380,7 +381,10 @@ class PagePreview(ttk.Frame):
                 result=self.renderer.results.get_nowait()
             except queue.Empty:break
             if result is not None and result['generation']==self._generation:
-                if result['op']=='error':self.selection.message.set(result['error'])
+                if result['op']=='error':
+                    self._load_failed=True
+                    self.page_text.set('Не удалось загрузить PDF')
+                    self.selection.message.set(result['error'])
                 elif result['op']=='open':
                     self._sizes=result['sizes']
                     if self._sizes:

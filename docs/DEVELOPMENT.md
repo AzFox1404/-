@@ -24,6 +24,7 @@ python tools/check_project.py
 | Переименование / сохранение / скорость переключения | `verify_rename_transaction.py` (Excel), `verify_word_transaction.py` (Word), `verify_journal_baseline.py` |
 | Захват мыши/стекло | `verify_home_drag_release.py`, `verify_glass_resize.py` |
 | Асинхронный PDF/автопрокрутка/fullscreen | `verify_async_pdf.py` |
+| Отказ PDF worker / зависимости | `verify_pdf_renderer_failure.py` — отсутствующий PyMuPDF в дочерней среде, понятная ошибка, авария процесса и повторное открытие того же диапазона |
 | PDF-масштаб без ожидания точных плиток | `verify_pdf_zoom.py` — синтетический А0 по умолчанию; BUREAU_ID_ZOOM_SAMPLE — один локальный образец (читается в временную копию), BUREAU_ID_ZOOM_BASELINE — необязательный старый pdf_page_preview.py для сравнения. История Git для обычной регрессии не нужна |
 | Символы, повороты, OCR, вставка | `verify_pdf_selection.py` (Windows OCR, временные синтетические документы) |
 | Запуск/рамка/изолированный анализ | `verify_window_lifecycle.py`, `verify_passport_process.py`, `verify_project_scan_lifecycle.py` — только синтетические временные проекты; настоящий PDF/JPEG OCR и авария дочернего процесса |
